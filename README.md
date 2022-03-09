@@ -1,2 +1,2 @@
-# FIU_SharkEcol
+# FIUSharkEcol
 Scripts for FIU shark ecology work
