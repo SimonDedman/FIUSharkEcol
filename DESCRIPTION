@@ -1,0 +1,14 @@
+Package: FIUSharkEcol
+Title: Shark Ecology at FIU
+Version: 0.0.1
+Authors@R: person("Simon", "Dedman", email = "simondedman@gmail.com", role = c("aut", "cre"))
+Description: TO BE FILLED.
+Depends:
+    R (>= 4.1.1)
+License: MIT + file LICENSE
+Encoding: UTF-8
+Language: en-GB
+LazyData: true
+Imports:
+    beepr (>= 1.2)
+RoxygenNote: 7.1.2
