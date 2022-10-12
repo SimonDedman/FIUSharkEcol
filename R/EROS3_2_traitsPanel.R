@@ -85,6 +85,56 @@ ggplot(MarketGravity.plot) + geom_boxplot(mapping = aes(x = MarketGravity, y = G
 ggsave(paste0(saveloc, today(), "_Boxplot-MarketGravity-GeoRange.png"), plot = last_plot(), device = "png",
        path = "", scale = 2, width = 6, height = 4.5, units = "in",dpi = 300, limitsize = TRUE)
 
+# Species Richness vs Market Gravity ####
+# 2022-10-11 await Katie Flowers reply
+# Frances reply
+# shannon index?
+# cos maxn = CPUE you're not getting an area sampled which will bug some people, have to say relative abundance
+# speak to someone more detail oriented?
+# by set: number of unique species seen in each video, average richness
+# how many seen overall by reef, vs doing it as a by-set thing?
+# her stuff, marquesas had high richness esp when including rays.
+# not sure how well maxn would play with richness? Similar to CPUE but not exactly.
+# Shannon weiner with CPUE means it should be convertible to maxn.
+# average per region, also 15 shark species here in general, but on average in any specific video we only saw 2.
+# number of unique species her extraction code, teleost & shark code.
+# https://github.com/nffarabaugh
+# https://github.com/nffarabaugh/Shark_exploration_forSimon
+# /home/simon/Dropbox/Galway/Analysis/R/NaomiFarabaugh/Shark_exploration_forSimon/
+# start with data.exploration_02_2022_ SharksOnly.R
+# that doc builds all the dataframes, then exported, and other stuff e.g. summary frames
+# spp_div is what I want = how many species per video
+# wide.df2.sharks.csv
+
+richness.plot <- finprint %>%
+  dplyr::rename(GeoRange = "GeographicRange_mk^2_Dulvy_etal_2021_CurrBiol",
+                CFAR = CFAR_illou_VDW_Dulvy) %>%
+  # by set: number of unique species seen in each video, average richness
+  # set_code
+  dplyr::group_by(set_code) %>%
+  dplyr::summarise(dplyr::across(c(1:20, 47:66, 73:98), first),
+                   Distinct_Species = dplyr::n_distinct(common_name),
+                   total_maxn = sum(maxn), # not used
+                   mean_maxn = sum(maxn) / dplyr::n_distinct(common_name)) %>%  # not used
+  dplyr::group_by(location_name, reef_name) %>%
+  dplyr::summarise(MarketGravity = round(mean(Grav_Total, na.rm = TRUE), digits = 2),
+                   Distinct_Species = round(mean(Distinct_Species, na.rm = TRUE), digits = 2)) %>%
+  dplyr::filter(!is.nan(MarketGravity)) %>% # remove NaN row MarketGravity
+  tidyr::unite(Location_Reef, c(location_name, reef_name), sep = ": ") %>% # join columns for format= 'location: reef (MarketGravity)'
+  dplyr::mutate(dummy = ")") %>% # dummy column to add ) later
+  tidyr::unite(Location_Reef, c(Location_Reef, MarketGravity), sep = " (", remove = FALSE) %>% # join cols adding (
+  tidyr::unite(Location_Reef_MarketGravity, c(Location_Reef, dummy), sep = "") %>% # join again, adds )
+  dplyr::arrange(MarketGravity) %>% # ordered by MarketGravity, low to high
+  dplyr::mutate(MarketGravity = cut(MarketGravity,
+                                    breaks = c(-Inf, 0, 5, 25, 100, 500, 1000, Inf),
+                                    labels = c("0", "<=5", "<=25", "<=100", "<=500", "<=1000", ">1000")))
+
+ggplot(richness.plot) +
+  geom_boxplot(mapping = aes(x = MarketGravity, y = Distinct_Species)) +
+  sd_theme
+ggsave(paste0(saveloc, today(), "_Boxplot-MarketGravity-Distinct_Species.png"), plot = last_plot(), device = "png",
+       path = "", scale = 2, width = 6, height = 4.5, units = "in",dpi = 300, limitsize = TRUE)
+
 
 # boxplots vs MaxN ####
 sort(finprint.plot$MaxN)
