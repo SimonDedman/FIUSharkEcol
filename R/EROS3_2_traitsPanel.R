@@ -1,9 +1,49 @@
 # EROS 3 depletions, Panel 2: Trait based measure across the gradient of fishing pressure.
 # Simon Dedman simondedman@gmail.com
 
-# read in excel database ####
+# library functions ####
 library(tidyverse)
 library(openxlsx)
+library(anytime)
+library(magrittr)
+library(ggplot2)
+library(lubridate)
+library(ggridges)
+library(scales)
+
+cutlogzero <- function(
+    x = NULL, # numeric vector
+    nbreaks = 10, # integer of breaks desired
+    unloglabs = FALSE # if x are logged, give the unlogged equivalents for labels
+){
+  nbreaks <- nbreaks - 2 # adds Infs at ends
+  x <- cut(x = x,
+           breaks = c(-Inf, 0:nbreaks, Inf),
+           if (unloglabs) {
+             labels = c(as.character(0),
+                        paste0("<=", round(expm1(1:nbreaks))), # labels in rounded log scale
+                        paste0(">", round(expm1(nbreaks))))
+           } else { # if not unloglabs, i.e. x are not logged, then:
+             labels = c(as.character(0),
+                        paste0("<=", 1:nbreaks), # labels in rounded log scale
+                        paste0(">", nbreaks))
+           } # close ifelse
+  ) # close cut
+  return(x) # returns a factor
+}
+
+# Theme & save location ####
+sd_theme <- ggplot2::theme_minimal() %+replace% theme(axis.text = element_text(size = rel(1.1)),
+                                                      title = element_text(size = rel(1.5)),
+                                                      panel.grid.minor = element_blank(), # remove mid value x & y axis gridlines
+                                                      panel.background = element_rect(fill = "white", colour = "grey50"), # white background
+                                                      plot.background = element_rect(fill = "white", colour = "grey50"), # white background
+                                                      strip.text.x = element_text(size = rel(2)),
+                                                      panel.border = element_rect(colour = "black", fill = NA, size = 1))
+saveloc <- "/home/simon/Documents/Si Work/PostDoc Work/FIU/Ecological Importance of Sharks Workshop/Papers Prep/2022 Science/3_DepletionGradient/Figures/Panel2_Traits_SD/"
+
+
+# load data ####
 finprint <- openxlsx::read.xlsx(xlsxFile = "/home/simon/Dropbox/FIU/FinPrint/Data/FinPrint_Set_Data_13Sep2022_KFlowers_SDedman.xlsx",
                                 sheet = 1,
                                 sep.names = "_",
@@ -11,21 +51,18 @@ finprint <- openxlsx::read.xlsx(xlsxFile = "/home/simon/Dropbox/FIU/FinPrint/Dat
                                 detectDates = TRUE) # converts excel style (e.g. 41056) dates but leaves characters "'22/01/2016" the same
 
 
-# fix dates ####
-library(anytime)
+# clean data ####
+# fix dates
 # anytime::getFormats()
 anytime::removeFormats("%m/%d/%Y")
 anytime::addFormats("%d/%m/%Y")
 finprint$set_date <- anytime::anydate(x = finprint$set_date)
 
-
 # filter for sharks only
-library(magrittr)
 finprint %<>% dplyr::filter(!stringr::str_detect(common_name, "ray|Ray|guitarfish|Guitarfish|wobbegong|Wobbegong|Carcharhinus sp.|Manta|manta|stingaree|numbfish|unknown|Unknown"))
 
 
 # prepare plot data ####
-library(ggplot2)
 data.plot <- finprint %>%
   dplyr::rename(GeoRange = "GeographicRange_mk^2_Dulvy_etal_2021_CurrBiol",
                 CFAR = CFAR_illou_VDW_Dulvy) %>%
@@ -41,26 +78,79 @@ data.plot <- finprint %>%
   # gradient of fishing pressure: protection_status, mpa_area	mpa_year_founded	mpa_isolation mpa_compliance Shark_Protection_Status	Shark_fishing_restrictions	Shark_gears Grav_Total
   dplyr::group_by(location_name, reef_name) %>% # group_by: region_name		location_name			site_name				reef_name
   dplyr::summarise(MarketGravity = round(mean(Grav_Total, na.rm = TRUE), digits = 2),
-                   MaxN = mean(maxn, na.rm = TRUE), # average [maxn, TL, CFAR, geoRange] per reef and country
-                   # max/mean trophic level swap here####
-                   TrophicLevel = max(TrophicLevel, na.rm = TRUE),
+                   MaxN = max(maxn, na.rm = TRUE), # average [maxn, TL, CFAR, geoRange] per reef and country
+                   TrophicLevel = mean(TrophicLevel, na.rm = TRUE),
+                   TrophicLevelMax = max(TrophicLevel, na.rm = TRUE),
                    CFAR = mean(CFAR, na.rm = TRUE),
                    GeoRange = mean(GeoRange, na.rm = TRUE)) %>%
   dplyr::filter(!is.nan(MarketGravity)) %>% # remove NaN row MarketGravity
   tidyr::unite(Location_Reef, c(location_name, reef_name), sep = ": ") %>% # join columns, location: reef (MarketGravity)
-  dplyr::mutate(dummy = ")") %>%
-  tidyr::unite(Location_Reef, c(Location_Reef, MarketGravity), sep = " (", remove = FALSE) %>%
-  tidyr::unite(Location_Reef_MarketGravity, c(Location_Reef, dummy), sep = "")
+  dplyr::mutate(dummy = ")", # add dummy column of closed brackets for next step
+                log1pMarketGravity = log1p(MarketGravity)) %>% # log market gravity for bins in ggplot
+  tidyr::unite(Location_Reef, c(Location_Reef, MarketGravity), sep = " (", remove = FALSE) %>% # join cols, don't remove originals
+  tidyr::unite(Location_Reef_MarketGravity, c(Location_Reef, dummy), sep = "") # join cols, do remove originals
 
-library(lubridate)
-sd_theme <- ggplot2::theme_minimal() %+replace% theme(axis.text = element_text(size = rel(1.5)),
-                                                      title = element_text(size = rel(1.5)),
-                                                      panel.grid.minor = element_blank(), # remove mid value x & y axis gridlines
-                                                      panel.background = element_rect(fill = "white", colour = "grey50"), # white background
-                                                      plot.background = element_rect(fill = "white", colour = "grey50"), # white background
-                                                      strip.text.x = element_text(size = rel(2)),
-                                                      panel.border = element_rect(colour = "black", fill = NA, size = 1))
-saveloc <- "/home/simon/Documents/Si Work/PostDoc Work/FIU/Ecological Importance of Sharks Workshop/Papers Prep/2022 Science/3_DepletionGradient/Figures/Panel2_Traits_SD/"
+
+
+# ggridges vs MarketGravity ####
+MarketGravity.plot <- data.plot %>%
+  dplyr::arrange(MarketGravity) %>% # ordered by MarketGravity, low to high
+  dplyr::mutate(MarketGravity = cutlogzero(x = MarketGravity, nbreaks = 10, unloglabs = TRUE))
+
+# CFAR
+ggplot(MarketGravity.plot, aes(x = CFAR, y = MarketGravity, group = MarketGravity)) +
+  geom_density_ridges(scale = 2, size = 0.25, rel_min_height = 0.03, alpha = 0.7) +
+  scale_x_continuous(limits = c(0.5, 5.5), expand = c(0, 0)) +
+  scale_y_discrete(expand = expand_scale(mult = c(0, 0.2))) +
+  coord_cartesian(clip = "off") +
+  coord_flip() +
+  labs(x = "Caudal Fin Aspect Ratio", y = "Market Gravity") +
+  theme_ridges(grid = FALSE, center_axis_labels = TRUE) %+replace% theme(panel.grid.minor = element_blank(), # remove mid value x & y axis gridlines
+                                                                         panel.background = element_rect(fill = "white", colour = "grey50"), # white background
+                                                                         plot.background = element_rect(fill = "white", colour = "grey50"), # white background
+                                                                         panel.border = element_rect(colour = "black", fill = NA, size = 1))
+ggsave(paste0(saveloc, today(), "_ridgeplot-MarketGravity-CFAR.png"), plot = last_plot(),
+       device = "png", path = "", scale = 1, width = 9, height = 5.94, units = "in", dpi = 300, limitsize = TRUE)
+
+
+# GeoRange
+ggplot(MarketGravity.plot, aes(x = GeoRange, y = MarketGravity, group = MarketGravity)) +
+  geom_density_ridges(scale = 2, size = 0.25, rel_min_height = 0.03, alpha = 0.7) +
+  scale_x_continuous(limits = c(-1500000, 18000000), labels = scales::unit_format(unit = "M", scale = 1e-6), expand = c(0, 0)) +
+  scale_y_discrete(expand = expand_scale(mult = c(0, 0.2))) + coord_cartesian(clip = "off") + coord_flip() +
+  labs(x = "Geographic Range (Km)", y = "Market Gravity") +
+  theme_ridges(grid = FALSE, center_axis_labels = TRUE) %+replace% theme(panel.grid.minor = element_blank(), # remove mid value x & y axis gridlines
+                                                                         panel.background = element_rect(fill = "white", colour = "grey50"), # white background
+                                                                         plot.background = element_rect(fill = "white", colour = "grey50"), # white background
+                                                                         panel.border = element_rect(colour = "black", fill = NA, size = 1))
+ggsave(paste0(saveloc, today(), "_ridgeplot-MarketGravity-GeoRange.png"), plot = last_plot(),
+       device = "png", path = "", scale = 1, width = 9, height = 5.94, units = "in", dpi = 300, limitsize = TRUE)
+
+# Trophic Level
+ggplot(MarketGravity.plot, aes(x = TrophicLevel, y = MarketGravity, group = MarketGravity)) +
+  geom_density_ridges(scale = 2, size = 0.25, rel_min_height = 0.03, alpha = 0.7) + #
+  scale_x_continuous(limits = c(3.3, 4.7), expand = c(0, 0)) + scale_y_discrete(expand = expand_scale(mult = c(0, 0.2))) +
+  coord_cartesian(clip = "off") + labs(x = "Trophic Level", y = "Market Gravity") + coord_flip() +
+  theme_ridges(grid = FALSE, center_axis_labels = TRUE) %+replace% theme(panel.grid.minor = element_blank(), # remove mid value x & y axis gridlines
+                                                                         panel.background = element_rect(fill = "white", colour = "grey50"), # white background
+                                                                         plot.background = element_rect(fill = "white", colour = "grey50"), # white background
+                                                                         panel.border = element_rect(colour = "black", fill = NA, size = 1))
+ggsave(paste0(saveloc, today(), "_ridgeplot-MarketGravity-TrophicLevel.png"), plot = last_plot(),
+       device = "png", path = "", scale = 1, width = 9, height = 5.94, units = "in", dpi = 300, limitsize = TRUE)
+
+# MaxTrophic Level: change L45, run lines 29 & 130
+ggplot(MarketGravity.plot, aes(x = TrophicLevelMax, y = MarketGravity, group = MarketGravity)) +
+  geom_density_ridges(scale = 2, size = 0.25, rel_min_height = 0.03, alpha = 0.7) + #
+  scale_x_continuous(limits = c(3.3, 4.6), expand = c(0, 0)) + scale_y_discrete(expand = expand_scale(mult = c(0, 0.2))) +
+  coord_cartesian(clip = "off") + coord_flip() + labs(x = "Maximum Trophic Level", y = "Market Gravity") +
+  theme_ridges(grid = FALSE, center_axis_labels = TRUE) %+replace% theme(panel.grid.minor = element_blank(), # remove mid value x & y axis gridlines
+                                                                         panel.background = element_rect(fill = "white", colour = "grey50"), # white background
+                                                                         plot.background = element_rect(fill = "white", colour = "grey50"), # white background
+                                                                         panel.border = element_rect(colour = "black", fill = NA, size = 1))
+ggsave(paste0(saveloc, today(), "_ridgeplot-MarketGravity-MaxTrophicLevel.png"), plot = last_plot(),
+       device = "png", path = "", scale = 1, width = 9, height = 5.94, units = "in", dpi = 300, limitsize = TRUE)
+
+
 
 # boxplots vs MarketGravity ####
 MarketGravity.plot <- data.plot %>%
@@ -69,13 +159,7 @@ MarketGravity.plot <- data.plot %>%
                                     breaks = c(-Inf, 0, 5, 25, 100, 500, 1000, Inf),
                                     labels = c("0", "<=5", "<=25", "<=100", "<=500", "<=1000", ">1000")),
                 MarketGravity = factor(x = MarketGravity, # reverse factor order for plotting
-                                       levels = rev(c("0", "<=5", "<=25", "<=100", "<=500", "<=1000", ">1000"))))
-# # reverse order
-# MarketGravity.plot <- data.plot %>%
-#   dplyr::arrange(desc(MarketGravity)) %>% # ordered by MarketGravity, low to high
-#   dplyr::mutate(MarketGravity = cut(MarketGravity,
-#                                     breaks = rev(c(-Inf, 0, 5, 25, 100, 500, 1000, Inf)),
-#                                     labels = rev(c("0", "<=5", "<=25", "<=100", "<=500", "<=1000", ">1000"))))
+                                       levels = c("0", "<=5", "<=25", "<=100", "<=500", "<=1000", ">1000"))) # reverse order with rev() here
 
 ggplot(MarketGravity.plot) + geom_boxplot(mapping = aes(x = MarketGravity, y = MaxN)) + sd_theme
 ggsave(paste0(saveloc, today(), "_Boxplot-MarketGravity-MaxN.png"),
@@ -87,70 +171,15 @@ ggsave(paste0(saveloc, today(), "_Boxplot-MarketGravity-MaxN.png"),
        dpi = 300, limitsize = TRUE)
 ggplot(MarketGravity.plot) + geom_boxplot(mapping = aes(x = MarketGravity, y = TrophicLevel)) + sd_theme
 ggsave(paste0(saveloc, today(), "_Boxplot-MarketGravity-TrophicLevel.png"), plot = last_plot(), device = "png",
-       path = "", scale = 2, width = 6, height = 4.5, units = "in",dpi = 300, limitsize = TRUE)
+       path = "", scale = 2, width = 9, height = 5.94, units = "in",dpi = 300, limitsize = TRUE)
 ggplot(MarketGravity.plot) + geom_boxplot(mapping = aes(x = MarketGravity, y = CFAR)) + sd_theme
 ggsave(paste0(saveloc, today(), "_Boxplot-MarketGravity-CFAR.png"), plot = last_plot(), device = "png",
-       path = "", scale = 2, width = 6, height = 4.5, units = "in",dpi = 300, limitsize = TRUE)
+       path = "", scale = 2, width = 9, height = 5.94, units = "in",dpi = 300, limitsize = TRUE)
 ggplot(MarketGravity.plot) + geom_boxplot(mapping = aes(x = MarketGravity, y = GeoRange)) + sd_theme
 ggsave(paste0(saveloc, today(), "_Boxplot-MarketGravity-GeoRange.png"), plot = last_plot(), device = "png",
-       path = "", scale = 2, width = 6, height = 4.5, units = "in",dpi = 300, limitsize = TRUE)
+       path = "", scale = 2, width = 9, height = 5.94, units = "in",dpi = 300, limitsize = TRUE)
 
 
-# ggridges vs MarketGravity ####
-# install.packages("ggridges")
-library(ggridges)
-library(scales)
-# CFAR
-ggplot(MarketGravity.plot, aes(x = CFAR, y = MarketGravity, group = MarketGravity)) +
-geom_density_ridges(scale = 2, size = 0.25, rel_min_height = 0.03, alpha = 0.7) +
-  scale_x_continuous(limits = c(0, 5.5), expand = c(0, 0)) +
-  scale_y_discrete(expand = c(0, 0)) +
-  coord_cartesian(clip = "off") +
-  labs(x = "Caudal Fin Aspect Ratio", y = "Market Gravity") +
-  theme_ridges(grid = FALSE, center_axis_labels = TRUE) %+replace% theme(panel.grid.minor = element_blank(), # remove mid value x & y axis gridlines
-                                                                         panel.background = element_rect(fill = "white", colour = "grey50"), # white background
-                                                                         plot.background = element_rect(fill = "white", colour = "grey50"), # white background
-                                                                         panel.border = element_rect(colour = "black", fill = NA, size = 1))
-ggsave(paste0(saveloc, today(), "_ridgeplot-MarketGravity-CFAR.png"), plot = last_plot(),
-       device = "png", path = "", scale = 1, width = 6, height = 4.5, units = "in", dpi = 300, limitsize = TRUE)
-
-# GeoRange
-ggplot(MarketGravity.plot, aes(x = GeoRange, y = MarketGravity, group = MarketGravity)) +
-  geom_density_ridges(scale = 2, size = 0.25, rel_min_height = 0.03, alpha = 0.7) +
-  scale_x_continuous(limits = c(0, 18000000), n.breaks = 8,
-                     labels = scales::unit_format(unit = "M", scale = 1e-6), expand = c(0, 0)) +
-  scale_y_discrete(expand = c(0, 0)) + coord_cartesian(clip = "off") +
-  labs(x = "Geographic Range (Km)", y = "Market Gravity") +
-  theme_ridges(grid = FALSE, center_axis_labels = TRUE) %+replace% theme(panel.grid.minor = element_blank(), # remove mid value x & y axis gridlines
-                                                                         panel.background = element_rect(fill = "white", colour = "grey50"), # white background
-                                                                         plot.background = element_rect(fill = "white", colour = "grey50"), # white background
-                                                                         panel.border = element_rect(colour = "black", fill = NA, size = 1))
-ggsave(paste0(saveloc, today(), "_ridgeplot-MarketGravity-GeoRange.png"), plot = last_plot(),
-       device = "png", path = "", scale = 1, width = 6, height = 4.5, units = "in", dpi = 300, limitsize = TRUE)
-
-# Trophic Level
-ggplot(MarketGravity.plot, aes(x = TrophicLevel, y = MarketGravity, group = MarketGravity)) +
-  geom_density_ridges(scale = 2, size = 0.25, rel_min_height = 0.03, alpha = 0.7) + #
-  scale_x_continuous(limits = c(3.6, 4.6), expand = c(0, 0)) + scale_y_discrete(expand = c(0, 0)) +
-  coord_cartesian(clip = "off") + labs(x = "Trophic Level", y = "Market Gravity") +
-  theme_ridges(grid = FALSE, center_axis_labels = TRUE) %+replace% theme(panel.grid.minor = element_blank(), # remove mid value x & y axis gridlines
-                                                                         panel.background = element_rect(fill = "white", colour = "grey50"), # white background
-                                                                         plot.background = element_rect(fill = "white", colour = "grey50"), # white background
-                                                                         panel.border = element_rect(colour = "black", fill = NA, size = 1))
-ggsave(paste0(saveloc, today(), "_ridgeplot-MarketGravity-TrophicLevel.png"), plot = last_plot(),
-       device = "png", path = "", scale = 1, width = 6, height = 4.5, units = "in", dpi = 300, limitsize = TRUE)
-
-# MaxTrophic Level: change L45, run lines 29 & 65
-ggplot(MarketGravity.plot, aes(x = TrophicLevel, y = MarketGravity, group = MarketGravity)) +
-  geom_density_ridges(scale = 2, size = 0.25, rel_min_height = 0.03, alpha = 0.7) + #
-  scale_x_continuous(limits = c(3.6, 4.8), expand = c(0, 0)) + scale_y_discrete(expand = c(0, 0)) +
-  coord_cartesian(clip = "off") + labs(x = "Maximum Trophic Level", y = "Market Gravity") +
-  theme_ridges(grid = FALSE, center_axis_labels = TRUE) %+replace% theme(panel.grid.minor = element_blank(), # remove mid value x & y axis gridlines
-                                                                         panel.background = element_rect(fill = "white", colour = "grey50"), # white background
-                                                                         plot.background = element_rect(fill = "white", colour = "grey50"), # white background
-                                                                         panel.border = element_rect(colour = "black", fill = NA, size = 1))
-ggsave(paste0(saveloc, today(), "_ridgeplot-MarketGravity-MaxTrophicLevel.png"), plot = last_plot(),
-       device = "png", path = "", scale = 1, width = 6, height = 4.5, units = "in", dpi = 300, limitsize = TRUE)
 
 
 # Species Richness vs Market Gravity boxplot####
@@ -197,16 +226,12 @@ richness.plot <- finprint %>%
                                     breaks = c(-Inf, 0, 5, 25, 100, 500, 1000, Inf),
                                     labels = c("0", "<=5", "<=25", "<=100", "<=500", "<=1000", ">1000")))
 
-ggplot(richness.plot) +
-  geom_boxplot(mapping = aes(x = MarketGravity, y = Distinct_Species)) +
-  sd_theme
+ggplot(richness.plot) + geom_boxplot(mapping = aes(x = MarketGravity, y = Distinct_Species)) + sd_theme
 ggsave(paste0(saveloc, today(), "_Boxplot-MarketGravity-Distinct_Species.png"), plot = last_plot(), device = "png",
-       path = "", scale = 2, width = 6, height = 4.5, units = "in",dpi = 300, limitsize = TRUE)
+       path = "", scale = 2, width = 9, height = 5.94, units = "in",dpi = 300, limitsize = TRUE)
 
 
 # boxplots vs MaxN ####
-sort(finprint.plot$MaxN)
-
 MaxN.plot <- data.plot %>%
   dplyr::arrange(MaxN) %>% # ordered by MarketGravity, low to high
   dplyr::mutate(MaxN = cut(MaxN,
@@ -215,23 +240,20 @@ MaxN.plot <- data.plot %>%
 
 ggplot(MaxN.plot) + geom_boxplot(mapping = aes(x = MaxN, y = log1p(MarketGravity))) + sd_theme
 ggsave(paste0(saveloc, today(), "_Boxplot-MaxN-MarketGravity.png"), plot = last_plot(), device = "png",
-       path = "", scale = 2, width = 6, height = 4.5, units = "in",dpi = 300, limitsize = TRUE)
+       path = "", scale = 2, width = 9, height = 5.94, units = "in",dpi = 300, limitsize = TRUE)
 ggplot(MaxN.plot) + geom_boxplot(mapping = aes(x = MaxN, y = TrophicLevel)) + sd_theme
 ggsave(paste0(saveloc, today(), "_Boxplot-MaxN-TrophicLevel.png"), plot = last_plot(), device = "png",
-       path = "", scale = 2, width = 6, height = 4.5, units = "in",dpi = 300, limitsize = TRUE)
+       path = "", scale = 2, width = 9, height = 5.94, units = "in",dpi = 300, limitsize = TRUE)
 ggplot(MaxN.plot) + geom_boxplot(mapping = aes(x = MaxN, y = CFAR)) + sd_theme
 ggsave(paste0(saveloc, today(), "_Boxplot-MaxN-CFAR.png"), plot = last_plot(), device = "png",
-       path = "", scale = 2, width = 6, height = 4.5, units = "in",dpi = 300, limitsize = TRUE)
+       path = "", scale = 2, width = 9, height = 5.94, units = "in",dpi = 300, limitsize = TRUE)
 ggplot(MaxN.plot) + geom_boxplot(mapping = aes(x = MaxN, y = GeoRange)) + sd_theme
 ggsave(paste0(saveloc, today(), "_Boxplot-MaxN-GeoRange.png"), plot = last_plot(), device = "png",
-       path = "", scale = 2, width = 6, height = 4.5, units = "in",dpi = 300, limitsize = TRUE)
-
+       path = "", scale = 2, width = 9, height = 5.94, units = "in",dpi = 300, limitsize = TRUE)
 # Trophic level: mean trophic level of species seen maybe smears out apex preds? Could be max trophic level?
-# Tried
-# WHERE'S THE CODE?!
-ggplot(MarketGravity.plot) + geom_boxplot(mapping = aes(x = MarketGravity, y = max(TrophicLevel, na.rm = TRUE))) + sd_theme
+ggplot(MarketGravity.plot) + geom_boxplot(mapping = aes(x = MarketGravity, y = TrophicLevelMax)) + sd_theme
 ggsave(paste0(saveloc, today(), "_Boxplot-MarketGravity-MaxTrophicLevel.png"), plot = last_plot(), device = "png",
-       path = "", scale = 2, width = 6, height = 4.5, units = "in",dpi = 300, limitsize = TRUE)
+       path = "", scale = 2, width = 9, height = 5.94, units = "in",dpi = 300, limitsize = TRUE)
 
 
 # scatterplot x=marketgravity not binned
