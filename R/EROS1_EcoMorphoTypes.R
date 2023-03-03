@@ -17,6 +17,17 @@ library(ggplot2)
 library(lubridate) # today
 library(png) # add images to plots
 library(grid) # add images to plots
+# https://corybrunson.github.io/ggalluvial/ nicer than
+# https://r-charts.com/flow/sankey-diagram-ggplot2/
+# install.packages("ggalluvial")
+# library(remotes)
+# remotes::install_github("corybrunson/ggalluvial@main", build_vignettes = TRUE)
+# https://github.com/corybrunson/ggalluvial/issues/110
+# alluvial and ggfittext not being installed that are required to build the vignettes.
+# Those packages are listed under Suggests: rather than under Imports: in the DESCRIPTION,
+# which i understand to be the correct policy for packages that are only required for vignettes.
+# Could you install those packages and try again?
+library(ggalluvial)
 
 # import data & images####
 emt <- read_sheet("https://docs.google.com/spreadsheets/d/1dNDEUENa4M1__VNksolw8Or9ysPutEYWMTgZJ-qOe9I/edit#gid=0")
@@ -61,7 +72,9 @@ emt %<>%
       . == "Medium" ~ 2,
       . == "Low" ~ 1
     )
-  ))
+  )) %>%
+  # remove rays
+  filter(!Ecomorphotype %in% c("Aquilopelagic", "Rajobenthic"))
 
 
 # Loop through nstudies effectSize strengthEffect for 5 grouping variables
@@ -78,7 +91,6 @@ for (groupvariable in c("Ecomorphotype", # groupvariable <- "Ecomorphotype"
   # nstudies table & plot####
   # nstudies <-
   emt %>%
-    filter(!Ecomorphotype %in% c("Aquilopelagic", "Rajobenthic")) %>% # remove rays
     select(c(all_of(groupvariable), contains("Effect Size"))) %>% # only select groupvariable & Effect Size columns - s.o.evidence is a dupe
     group_by(.data[[groupvariable]]) %>%
     summarise(across(
@@ -146,7 +158,6 @@ for (groupvariable in c("Ecomorphotype", # groupvariable <- "Ecomorphotype"
   # mean effect table & plot####
   # meaneffect <-
   emt %>%
-    filter(!Ecomorphotype %in% c("Aquilopelagic", "Rajobenthic")) %>% # remove rays
     select(c(all_of(groupvariable), contains("Effect Size"))) %>% # only select Effect Size columns
     group_by(.data[[groupvariable]]) %>%
     summarise_all(mean, na.rm = TRUE) %>%
@@ -206,7 +217,6 @@ for (groupvariable in c("Ecomorphotype", # groupvariable <- "Ecomorphotype"
   # mean evidence table####
   # meanevidence <-
   emt %>%
-    filter(!Ecomorphotype %in% c("Aquilopelagic", "Rajobenthic")) %>% # remove rays
     select(c(all_of(groupvariable), contains("Evidence"))) %>% # only select Effect Size columns
     group_by(.data[[groupvariable]]) %>%
     summarise_all(mean, na.rm = TRUE) %>%
@@ -261,3 +271,840 @@ for (groupvariable in c("Ecomorphotype", # groupvariable <- "Ecomorphotype"
   )
 
 } # close groupvariable loop
+
+
+#2023-02-09 EMT scatterplot ####
+emt %<>%
+  # Need to parse each row out into multi rows when they have more than 1 effect type/SoE combo
+  # Need 1 column each for effect type, SoE, EMT.
+  tidyr::pivot_longer(cols = contains("Effect Size"),
+                      names_to = "Effect Type",
+                      values_to = "Effect Size") %>%
+  tidyr::pivot_longer(cols = contains("Strength of Evidence"),
+                      names_to = "Effect Type2",
+                      values_to = "Strength of Evidence") %>%
+  # remove ": Effect Size" & ": Strength of Evidence"
+  mutate(`Effect Type` = str_remove_all(string = `Effect Type`, pattern = ": Effect Size"),
+         `Effect Type2` = str_remove_all(string = `Effect Type2`, pattern = ": Strength of Evidence"),
+         # double pivot_longer creates n=effecttype^2 rows, all permutations of both. Collapse to where both match
+         EffectTypesMatch = ifelse(`Effect Type` == `Effect Type2`, TRUE, FALSE),
+         # also want to remove when both are NA later
+         BothNA = ifelse(is.na(`Effect Size`) & is.na(`Strength of Evidence`), TRUE, FALSE),
+         # for plotting, make integer = discrete
+         `Effect Size` = as.integer(`Effect Size`),
+         `Strength of Evidence` = as.integer(`Strength of Evidence`),
+         # so the legend order is logical
+         `Effect Type` = ordered(`Effect Type`,
+                                 levels = c("Top-down: Direct Predation",
+                                            "Top-down: Risk Effects",
+                                            "Top-down: Trophic Cascade",
+                                            "Competition",
+                                            "Bottom-up: Nutrient Vector Storage: Sharks as Food",
+                                            "Bottom-up: Nutrient Vector Storage: Excretion & Egestion"))) %>%
+  # filter for only those that match, remove permutation dupes
+  filter(EffectTypesMatch,
+         # remove where both are NA
+         !BothNA) %>%
+  # remove temp columns
+  select(!c(`Effect Type2`, EffectTypesMatch, BothNA)) %>%
+  # keep only columns needed for this plot
+  select(Ecomorphotype, `Effect Type`, `Effect Size`, `Strength of Evidence`)
+
+saveRDS(emt, file = paste0(saveloc, today(), "_EMTdata.rds"))
+
+ggplot(emt) +
+  # jitter is a shortcut for geom_point position = "jitter". Not great for discrete 1:3 though.
+  geom_jitter(mapping = aes(x = `Effect Size`,
+                            y = `Strength of Evidence`,
+                            colour = `Effect Type`,
+                            shape = Ecomorphotype),
+              size = 3) + # width = 0.9, height = 0.9 does nothing
+  # change labels 1 2 3 to low medium high
+  scale_x_discrete(limits = 1:3,
+                   labels = c("Low", "Medium", "High"),
+                   expand = c(0,0)) +
+  scale_y_discrete(limits = 1:3,
+                   labels = c("Low", "Medium", "High"),
+                   expand = c(0,0)) +
+  # match colours to map figure
+  scale_colour_manual(values = c("red",
+                                      "dodgerblue4",
+                                      "darkorchid4",
+                                      "darkorange1",
+                                      "goldenrod3",
+                                      "green3")) +
+                                        theme_minimal() %+replace% theme(
+                                          axis.text = element_text(size = rel(1.5)),
+                                          axis.title = element_text(size = rel(2)),
+                                          legend.text = element_text(size = rel(1.5)),
+                                          legend.title = element_text(size = rel(1.5)),
+                                          legend.title.align = 0, # otherwise effect type title centre aligned for some reason
+                                          plot.background = element_rect(fill = "white", colour = "grey50"), # white background
+                                          strip.text.x = element_text(size = rel(2)),
+                                          panel.border = element_rect(colour = "black", fill = NA, size = 1),
+                                          legend.spacing.x = unit(0, "cm"), # compress spacing between legend items, this is min
+                                          legend.background = element_blank(),
+                                          panel.background = element_rect(fill = "white", colour = "grey50"),
+                                          panel.grid = element_line(colour = "grey90"),
+                                          legend.key = element_blank()) # removed whitespace buffer around legend boxes which is nice
+
+ggsave(paste0(saveloc, today(), "_Scatter_x-EfSz_y-SoEv_col-EfTyp_shp-EMT.png"),
+       plot = last_plot(), device = "png", path = "",
+       scale = 2, # changes how big lines & legend items & axes & titles are relative to basemap. Smaller number = bigger items
+       width = 10, # NA default. Manually adjust plot box in RStudio after ggplot()
+       height = 6, # NA default; Then ggsave with defaults, changes from 7x7" to e.g.
+       units = "in", # c("in", "cm", "mm"); 6.32x4, tweak as necessary. Removes canvas whitespace
+       dpi = 300, limitsize = TRUE
+)
+
+
+
+
+
+
+
+# emt scatterplot facet EMT & Effect type ####
+# facet this panels with a facet_wrap() so that ecomorphotypes & type of interaction are presented on separate graphs
+ggplot(emt) +
+  # jitter is a shortcut for geom_point position = "jitter". Not great for discrete 1:3 though.
+  geom_jitter(mapping = aes(x = `Effect Size`,
+                            y = `Strength of Evidence`,
+                            colour = `Effect Type`,
+                            shape = Ecomorphotype),
+              size = 3) + # width = 0.9, height = 0.9 does nothing
+  facet_wrap(vars(`Effect Type`, Ecomorphotype)) +
+  # change labels 1 2 3 to low medium high
+  scale_x_discrete(limits = 1:3,
+                   labels = c("Low", "Medium", "High"),
+                   expand = c(0,0)) +
+  scale_y_discrete(limits = 1:3,
+                   labels = c("Low", "Medium", "High"),
+                   expand = c(0,0)) +
+  # match colours to map figure
+  scale_colour_manual(
+    values = c("red",
+                    "dodgerblue4",
+                    "darkorchid4",
+                    "darkorange1",
+                    "goldenrod3",
+                    "green3")) +
+                      theme_minimal() %+replace% theme(
+                        axis.text = element_text(size = rel(1.5)),
+                        axis.title = element_text(size = rel(2)),
+                        legend.text = element_text(size = rel(1.5)),
+                        legend.title = element_text(size = rel(1.5)),
+                        legend.title.align = 0, # otherwise effect type title centre aligned for some reason
+                        plot.background = element_rect(fill = "white", colour = "grey50"), # white background
+                        strip.text.x = element_text(size = rel(2)),
+                        panel.border = element_rect(colour = "black", fill = NA, size = 1),
+                        legend.spacing.x = unit(0, "cm"), # compress spacing between legend items, this is min
+                        legend.background = element_blank(),
+                        panel.background = element_rect(fill = "white", colour = "grey50"),
+                        panel.grid = element_line(colour = "grey90"),
+                        legend.key = element_blank()
+                      ) # removed whitespace buffer around legend boxes which is nice
+
+ggsave(paste0(saveloc, today(), "_Scatter_x-EfSz_y-SoEv_col-EfTyp_shp-EMT_FacetEfTypEMT.png"),
+       plot = last_plot(), device = "png", path = "",
+       scale = 2, # changes how big lines & legend items & axes & titles are relative to basemap. Smaller number = bigger items
+       width = 10, # NA default. Manually adjust plot box in RStudio after ggplot()
+       height = 6, # NA default; Then ggsave with defaults, changes from 7x7" to e.g.
+       units = "in", # c("in", "cm", "mm"); 6.32x4, tweak as necessary. Removes canvas whitespace
+       dpi = 300, limitsize = TRUE
+)
+
+
+# emt scatterplot facet EMT ####
+ggplot(emt) +
+  geom_jitter(mapping = aes(x = `Effect Size`,
+                            y = `Strength of Evidence`,
+                            colour = `Effect Type`,
+                            shape = Ecomorphotype),
+              size = 3) +
+  facet_wrap(vars(Ecomorphotype)) +
+  scale_x_discrete(limits = 1:3,
+                   labels = c("Low", "Medium", "High"),
+                   expand = c(0,0)) +
+  scale_y_discrete(limits = 1:3,
+                   labels = c("Low", "Medium", "High"),
+                   expand = c(0,0)) +
+  scale_colour_manual(
+    values = c("red",
+                    "dodgerblue4",
+                    "darkorchid4",
+                    "darkorange1",
+                    "goldenrod3",
+                    "green3")) +
+                      theme_minimal() %+replace% theme(
+                        axis.text = element_text(size = rel(1.5)),
+                        axis.title = element_text(size = rel(2)),
+                        legend.text = element_text(size = rel(1.5)),
+                        legend.title = element_text(size = rel(1.5)),
+                        legend.title.align = 0, # otherwise effect type title centre aligned for some reason
+                        plot.background = element_rect(fill = "white", colour = "grey50"), # white background
+                        strip.text.x = element_text(size = rel(2)),
+                        panel.border = element_rect(colour = "black", fill = NA, size = 1),
+                        legend.spacing.x = unit(0, "cm"), # compress spacing between legend items, this is min
+                        legend.background = element_blank(),
+                        panel.background = element_rect(fill = "white", colour = "grey50"),
+                        panel.grid = element_line(colour = "grey90"),
+                        legend.key = element_blank()
+                      ) # removed whitespace buffer around legend boxes which is nice
+
+ggsave(paste0(saveloc, today(), "_Scatter_x-EfSz_y-SoEv_col-EfTyp_shp-EMT_FacetEMT.png"),
+       plot = last_plot(), device = "png", path = "",
+       scale = 2, width = 10, height = 2.5, units = "in", dpi = 300, limitsize = TRUE)
+
+
+# emt scatterplot facet `Effect Type` ####
+ggplot(emt) +
+  geom_jitter(mapping = aes(x = `Effect Size`,
+                            y = `Strength of Evidence`,
+                            colour = `Effect Type`,
+                            shape = Ecomorphotype),
+              size = 3) +
+  facet_wrap(vars(`Effect Type`)) +
+  scale_x_discrete(limits = 1:3,
+                   labels = c("Low", "Medium", "High"),
+                   expand = c(0,0)) +
+  scale_y_discrete(limits = 1:3,
+                   labels = c("Low", "Medium", "High"),
+                   expand = c(0,0)) +
+  scale_colour_manual(
+    values = c("red",
+                    "dodgerblue4",
+                    "darkorchid4",
+                    "darkorange1",
+                    "goldenrod3",
+                    "green3")) +
+                      theme_minimal() %+replace% theme(
+                        axis.text = element_text(size = rel(1.5)),
+                        axis.title = element_text(size = rel(2)),
+                        legend.text = element_text(size = rel(1.5)),
+                        legend.title = element_text(size = rel(1.5)),
+                        legend.title.align = 0, # otherwise effect type title centre aligned for some reason
+                        plot.background = element_rect(fill = "white", colour = "grey50"), # white background
+                        strip.text.x = element_text(size = rel(2)),
+                        panel.border = element_rect(colour = "black", fill = NA, size = 1),
+                        legend.spacing.x = unit(0, "cm"), # compress spacing between legend items, this is min
+                        legend.background = element_blank(),
+                        panel.background = element_rect(fill = "white", colour = "grey50"),
+                        panel.grid = element_line(colour = "grey90"),
+                        legend.key = element_blank()
+                      ) # removed whitespace buffer around legend boxes which is nice
+
+ggsave(paste0(saveloc, today(), "_Scatter_x-EfSz_y-SoEv_col-EfTyp_shp-EMT_FacetEfTyp.png"),
+       plot = last_plot(), device = "png", path = "",
+       scale = 2, width = 10, height = 4, units = "in", dpi = 300, limitsize = TRUE)
+
+
+
+
+
+
+
+
+
+
+# 2023-02-10 Sankey AKA alluvial plot ####
+# load & prep variables
+saveloc <- "/home/simon/Documents/Si Work/PostDoc Work/FIU/Ecological Importance of Sharks Workshop/Papers Prep/2022 Science/1_EROS/"
+emt <- readRDS(file = paste0(saveloc, "2023-02-22", "_EMTdata.rds")) %>%
+  # make (ordered) factors for all but Freq. Effect type already done above.
+  mutate(Ecomorphotype = ordered(Ecomorphotype, levels = c("Archipelagic", "Littoral", "Macroceanic")),
+         `Effect Size` = ordered(`Effect Size`, levels = c(3, 2, 1)),
+         `Strength of Evidence` = ordered(`Strength of Evidence`, levels = c(3, 2, 1)))
+
+# All 4 variables, no colour ####
+ggplot(data = emt %>%
+         # create a Freq column which is a count of all rows with the same attributes for all other columns
+         group_by(Ecomorphotype, `Effect Type`, `Effect Size`, `Strength of Evidence`) %>%
+         summarise(Count = n()),
+       aes(axis1 = Ecomorphotype,
+           axis2 = `Effect Type`,
+           axis3 = `Effect Size`,
+           axis4 = `Strength of Evidence`,
+           y = Count)
+) +
+  scale_x_discrete(limits = c("Ecomorphotype",
+                              "Effect Type",
+                              "Effect Size",
+                              "Strength of Evidence"),
+                   expand = c(.2, .05)) +
+  # xlab("Demographic") +
+  geom_alluvium() + # aes(fill = `Strength of Evidence`)
+  geom_stratum() +
+  geom_text(stat = "stratum", aes(label = after_stat(stratum))) + # what does this do?
+  # ggtitle("passengers on the maiden voyage of the Titanic",
+  #         "stratified by demographics and survival") +
+  theme_minimal() %+replace% theme(
+    axis.text = element_text(size = rel(1.5)),
+    axis.title = element_text(size = rel(2)),
+    legend.text = element_text(size = rel(1.5)),
+    legend.title = element_text(size = rel(1.5)),
+    legend.title.align = 0, # otherwise effect type title centre aligned for some reason
+    plot.background = element_rect(fill = "white", colour = "grey50"), # white background
+    strip.text.x = element_text(size = rel(2)),
+    panel.border = element_rect(colour = "black", fill = NA, size = 1),
+    legend.spacing.x = unit(0, "cm"), # compress spacing between legend items, this is min
+    legend.background = element_blank(),
+    panel.background = element_rect(fill = "white", colour = "grey50"),
+    panel.grid = element_line(colour = "grey90"),
+    legend.key = element_blank()
+  ) # removed whitespace buffer around legend boxes which is nice
+
+ggsave(paste0(saveloc, today(), "_SankeyAlluvial_EMT-EfTyp-EfSiz-SoEv.png"),
+       plot = last_plot(), device = "png", path = "",
+       scale = 2, width = 10, height = 4, units = "in", dpi = 300, limitsize = TRUE)
+
+
+
+# 3bar: EMT, EfTyp, EfSiz, SoEv=colour ####
+ggplot(data = emt %>%
+         # create a Freq column which is a count of all rows with the same attributes for all other columns
+         group_by(Ecomorphotype, `Effect Type`, `Effect Size`, `Strength of Evidence`) %>%
+         summarise(Count = n()),
+       aes(axis1 = Ecomorphotype,
+           axis2 = `Effect Type`,
+           axis3 = `Effect Size`,
+           y = Count)
+) +
+  scale_x_discrete(limits = c("Ecomorphotype",
+                              "Effect Type",
+                              "Effect Size"),
+                   expand = c(.2, .05)) +
+  # xlab("Demographic") +
+  geom_alluvium(aes(fill = `Strength of Evidence`)) + #
+  geom_stratum() +
+  geom_text(stat = "stratum", aes(label = after_stat(stratum))) + # what does this do?
+  # ggtitle("passengers on the maiden voyage of the Titanic",
+  #         "stratified by demographics and survival") +
+  theme_minimal() %+replace% theme(
+    axis.text = element_text(size = rel(1.5)),
+    axis.title = element_text(size = rel(2)),
+    legend.text = element_text(size = rel(1.5)),
+    legend.title = element_text(size = rel(1.5)),
+    legend.title.align = 0, # otherwise effect type title centre aligned for some reason
+    plot.background = element_rect(fill = "white", colour = "grey50"), # white background
+    strip.text.x = element_text(size = rel(2)),
+    panel.border = element_rect(colour = "black", fill = NA, size = 1),
+    legend.spacing.x = unit(0, "cm"), # compress spacing between legend items, this is min
+    legend.background = element_blank(),
+    panel.background = element_rect(fill = "white", colour = "grey50"),
+    panel.grid = element_line(colour = "grey90"),
+    legend.key = element_blank()
+  ) # removed whitespace buffer around legend boxes which is nice
+
+ggsave(paste0(saveloc, today(), "_SankeyAlluvial_EMT-EfTyp-EfSiz_Col-SoEv.png"),
+       plot = last_plot(), device = "png", path = "",
+       scale = 2, width = 10, height = 4, units = "in", dpi = 300, limitsize = TRUE)
+
+
+# 3bar: EMT, EfSiz, EfTyp rearrange, SoEv=colour ####
+ggplot(data = emt %>%
+         # create a Freq column which is a count of all rows with the same attributes for all other columns
+         group_by(Ecomorphotype, `Effect Type`, `Effect Size`, `Strength of Evidence`) %>%
+         summarise(Count = n()),
+       aes(axis1 = Ecomorphotype,
+           axis2 = `Effect Size`,
+           axis3 = `Effect Type`,
+           y = Count)
+) +
+  scale_x_discrete(limits = c("Ecomorphotype",
+                              "Effect Size",
+                              "Effect Type"),
+                   expand = c(.2, .05)) +
+  # xlab("Demographic") +
+  geom_alluvium(aes(fill = `Strength of Evidence`)) + #
+  geom_stratum() +
+  geom_text(stat = "stratum", aes(label = after_stat(stratum))) + # what does this do?
+  # ggtitle("passengers on the maiden voyage of the Titanic",
+  #         "stratified by demographics and survival") +
+  theme_minimal() %+replace% theme(
+    axis.text = element_text(size = rel(1.5)),
+    axis.title = element_text(size = rel(2)),
+    legend.text = element_text(size = rel(1.5)),
+    legend.title = element_text(size = rel(1.5)),
+    legend.title.align = 0, # otherwise effect type title centre aligned for some reason
+    plot.background = element_rect(fill = "white", colour = "grey50"), # white background
+    strip.text.x = element_text(size = rel(2)),
+    panel.border = element_rect(colour = "black", fill = NA, size = 1),
+    legend.spacing.x = unit(0, "cm"), # compress spacing between legend items, this is min
+    legend.background = element_blank(),
+    panel.background = element_rect(fill = "white", colour = "grey50"),
+    panel.grid = element_line(colour = "grey90"),
+    legend.key = element_blank()
+  ) # removed whitespace buffer around legend boxes which is nice
+
+ggsave(paste0(saveloc, today(), "_SankeyAlluvial_EMT-EfSiz-EfTyp_Col-SoEv.png"),
+       plot = last_plot(), device = "png", path = "",
+       scale = 2, width = 10, height = 4, units = "in", dpi = 300, limitsize = TRUE)
+
+
+
+# 3bar: EMT, EfSiz, SoEv, EfTyp=colour ####
+ggplot(data = emt %>%
+         # create a Freq column which is a count of all rows with the same attributes for all other columns
+         group_by(Ecomorphotype, `Effect Type`, `Effect Size`, `Strength of Evidence`) %>%
+         summarise(Count = n()),
+       aes(axis1 = Ecomorphotype,
+           axis2 = `Effect Size`,
+           axis3 = `Strength of Evidence`,
+           y = Count)
+) +
+  scale_x_discrete(limits = c("Ecomorphotype",
+                              "Effect Size",
+                              "Strength of Evidence"),
+                   expand = c(.2, .05)) +
+  # xlab("Demographic") +
+  geom_alluvium(aes(fill = `Effect Type`)) + #
+  scale_fill_manual(values = c("red", "dodgerblue4", "darkorchid4", "darkorange1", "goldenrod3", "green3")) +
+  geom_stratum() +
+  geom_text(stat = "stratum", aes(label = after_stat(stratum))) + # what does this do?
+  # ggtitle("passengers on the maiden voyage of the Titanic",
+  #         "stratified by demographics and survival") +
+  theme_minimal() %+replace% theme(
+    axis.text = element_text(size = rel(1.5)),
+    axis.title = element_text(size = rel(2)),
+    legend.text = element_text(size = rel(1)),
+    legend.title = element_text(size = rel(1.5)),
+    legend.title.align = 0, # otherwise effect type title centre aligned for some reason
+    plot.background = element_rect(fill = "white", colour = "grey50"), # white background
+    strip.text.x = element_text(size = rel(2)),
+    panel.border = element_rect(colour = "black", fill = NA, size = 1),
+    legend.spacing.x = unit(0, "cm"), # compress spacing between legend items, this is min
+    legend.background = element_blank(),
+    panel.background = element_rect(fill = "white", colour = "grey50"),
+    panel.grid = element_line(colour = "grey90"),
+    legend.key = element_blank()
+  ) # removed whitespace buffer around legend boxes which is nice
+
+ggsave(paste0(saveloc, today(), "_SankeyAlluvial_EMT-EfSiz-SoEv_Col-EfTyp.png"),
+       plot = last_plot(), device = "png", path = "",
+       scale = 2, width = 10, height = 4, units = "in", dpi = 300, limitsize = TRUE)
+
+
+
+# 3bar: EfTyp, EfSiz, SoEv, EMT=colour ####
+ggplot(data = emt %>%
+         # create a Freq column which is a count of all rows with the same attributes for all other columns
+         group_by(Ecomorphotype, `Effect Type`, `Effect Size`, `Strength of Evidence`) %>%
+         summarise(Count = n()),
+       aes(axis1 = `Effect Type`,
+           axis2 = `Effect Size`,
+           axis3 = `Strength of Evidence`,
+           y = Count)
+) +
+  scale_x_discrete(limits = c("Effect Type",
+                              "Effect Size",
+                              "Strength of Evidence"),
+                   expand = c(.2, .05)) +
+  # xlab("Demographic") +
+  geom_alluvium(aes(fill = Ecomorphotype)) + #
+  # scale_fill_manual(values = c("red", "dodgerblue4", "darkorchid4", "darkorange1", "goldenrod3", "green3")) +
+  geom_stratum() +
+  geom_text(stat = "stratum", aes(label = after_stat(stratum))) + # what does this do?
+  # ggtitle("passengers on the maiden voyage of the Titanic",
+  #         "stratified by demographics and survival") +
+  theme_minimal() %+replace% theme(
+    axis.text = element_text(size = rel(1.5)),
+    axis.title = element_text(size = rel(2)),
+    legend.text = element_text(size = rel(1)),
+    legend.title = element_text(size = rel(1.5)),
+    legend.title.align = 0, # otherwise effect type title centre aligned for some reason
+    plot.background = element_rect(fill = "white", colour = "grey50"), # white background
+    strip.text.x = element_text(size = rel(2)),
+    panel.border = element_rect(colour = "black", fill = NA, size = 1),
+    legend.spacing.x = unit(0, "cm"), # compress spacing between legend items, this is min
+    legend.background = element_blank(),
+    panel.background = element_rect(fill = "white", colour = "grey50"),
+    panel.grid = element_line(colour = "grey90"),
+    legend.key = element_blank()
+  ) # removed whitespace buffer around legend boxes which is nice
+
+ggsave(paste0(saveloc, today(), "_SankeyAlluvial_EfTyp-EfSiz-SoEv_Col-EMT.png"),
+       plot = last_plot(), device = "png", path = "",
+       scale = 2, width = 10, height = 4, units = "in", dpi = 300, limitsize = TRUE)
+
+
+
+# 2bar: EfTyp, EMT, EfSiz=colour ####
+# SoEv,
+ggplot(data = emt %>%
+         # create a Freq column which is a count of all rows with the same attributes for all other columns
+         group_by(`Effect Type`, Ecomorphotype, `Effect Size`) %>%
+         summarise(Count = n()),
+       aes(axis1 = `Effect Type`,
+           axis2 = Ecomorphotype,
+           y = Count)
+) +
+  scale_x_discrete(limits = c("Effect Type",
+                              "Ecomorphotype"),
+                   expand = c(.2, .05)) +
+  # xlab("Demographic") +
+  geom_alluvium(aes(fill = `Effect Size`)) + #
+  # scale_fill_manual(values = c("red", "dodgerblue4", "darkorchid4", "darkorange1", "goldenrod3", "green3")) +
+  geom_stratum() +
+  geom_text(stat = "stratum", aes(label = after_stat(stratum))) + # what does this do?
+  # ggtitle("passengers on the maiden voyage of the Titanic",
+  #         "stratified by demographics and survival") +
+  theme_minimal() %+replace% theme(
+    axis.text = element_text(size = rel(1.5)),
+    axis.title = element_text(size = rel(2)),
+    legend.text = element_text(size = rel(1)),
+    legend.title = element_text(size = rel(1.5)),
+    legend.title.align = 0, # otherwise effect type title centre aligned for some reason
+    plot.background = element_rect(fill = "white", colour = "grey50"), # white background
+    strip.text.x = element_text(size = rel(2)),
+    panel.border = element_rect(colour = "black", fill = NA, size = 1),
+    legend.spacing.x = unit(0, "cm"), # compress spacing between legend items, this is min
+    legend.background = element_blank(),
+    panel.background = element_rect(fill = "white", colour = "grey50"),
+    panel.grid = element_line(colour = "grey90"),
+    legend.key = element_blank()
+  ) # removed whitespace buffer around legend boxes which is nice
+
+ggsave(paste0(saveloc, today(), "_SankeyAlluvial_EfTyp-EMT_Col-EfSiz.png"),
+       plot = last_plot(), device = "png", path = "",
+       scale = 2, width = 10, height = 4, units = "in", dpi = 300, limitsize = TRUE)
+
+
+
+# 2bar: EfTyp, EMT, SoEv=colour ####
+ggplot(data = emt %>%
+         # create a Freq column which is a count of all rows with the same attributes for all other columns
+         group_by(`Effect Type`, Ecomorphotype, `Strength of Evidence`) %>%
+         summarise(Count = n()),
+       aes(axis1 = `Effect Type`,
+           axis2 = Ecomorphotype,
+           y = Count)
+) +
+  scale_x_discrete(limits = c("Effect Type",
+                              "Ecomorphotype"),
+                   expand = c(.2, .05)) +
+  # xlab("Demographic") +
+  geom_alluvium(aes(fill = `Strength of Evidence`)) + #
+  # scale_fill_manual(values = c("red", "dodgerblue4", "darkorchid4", "darkorange1", "goldenrod3", "green3")) +
+  geom_stratum() +
+  geom_text(stat = "stratum", aes(label = after_stat(stratum))) + # what does this do?
+  # ggtitle("passengers on the maiden voyage of the Titanic",
+  #         "stratified by demographics and survival") +
+  theme_minimal() %+replace% theme(
+    axis.text = element_text(size = rel(1.5)),
+    axis.title = element_text(size = rel(2)),
+    legend.text = element_text(size = rel(1)),
+    legend.title = element_text(size = rel(1.5)),
+    legend.title.align = 0, # otherwise effect type title centre aligned for some reason
+    plot.background = element_rect(fill = "white", colour = "grey50"), # white background
+    strip.text.x = element_text(size = rel(2)),
+    panel.border = element_rect(colour = "black", fill = NA, size = 1),
+    legend.spacing.x = unit(0, "cm"), # compress spacing between legend items, this is min
+    legend.background = element_blank(),
+    panel.background = element_rect(fill = "white", colour = "grey50"),
+    panel.grid = element_line(colour = "grey90"),
+    legend.key = element_blank()
+  ) # removed whitespace buffer around legend boxes which is nice
+
+ggsave(paste0(saveloc, today(), "_SankeyAlluvial_EfTyp-EMT_Col-SoEv.png"),
+       plot = last_plot(), device = "png", path = "",
+       scale = 2, width = 10, height = 4, units = "in", dpi = 300, limitsize = TRUE)
+
+
+
+# 2bar: EMT, EfTyp, EfSiz=colour ####
+ggplot(data = emt %>%
+         # create a Freq column which is a count of all rows with the same attributes for all other columns
+         group_by(Ecomorphotype, `Effect Type`, `Effect Size`) %>%
+         summarise(Count = n()),
+       aes(axis1 = Ecomorphotype,
+           axis2 = `Effect Type`,
+           y = Count)
+) +
+  scale_x_discrete(limits = c("Ecomorphotype",
+                              "Effect Type"),
+                   expand = c(.2, .05)) +
+  # xlab("Demographic") +
+  geom_alluvium(aes(fill = `Effect Size`)) + #
+  # scale_fill_manual(values = c("red", "dodgerblue4", "darkorchid4", "darkorange1", "goldenrod3", "green3")) +
+  geom_stratum() +
+  geom_text(stat = "stratum", aes(label = after_stat(stratum))) + # what does this do?
+  # ggtitle("passengers on the maiden voyage of the Titanic",
+  #         "stratified by demographics and survival") +
+  theme_minimal() %+replace% theme(
+    axis.text = element_text(size = rel(1.5)),
+    axis.title = element_text(size = rel(2)),
+    legend.text = element_text(size = rel(1)),
+    legend.title = element_text(size = rel(1.5)),
+    legend.title.align = 0, # otherwise effect type title centre aligned for some reason
+    plot.background = element_rect(fill = "white", colour = "grey50"), # white background
+    strip.text.x = element_text(size = rel(2)),
+    panel.border = element_rect(colour = "black", fill = NA, size = 1),
+    legend.spacing.x = unit(0, "cm"), # compress spacing between legend items, this is min
+    legend.background = element_blank(),
+    panel.background = element_rect(fill = "white", colour = "grey50"),
+    panel.grid = element_line(colour = "grey90"),
+    legend.key = element_blank()
+  ) # removed whitespace buffer around legend boxes which is nice
+
+ggsave(paste0(saveloc, today(), "_SankeyAlluvial_EMT-EfTyp_Col-EfSiz.png"),
+       plot = last_plot(), device = "png", path = "",
+       scale = 2, width = 10, height = 4, units = "in", dpi = 300, limitsize = TRUE)
+
+
+
+# 2bar: EMT, EfTyp, col=SoEv ####
+ggplot(data = emt %>%
+         # create a Freq column which is a count of all rows with the same attributes for all other columns
+         group_by(Ecomorphotype, `Effect Type`, `Strength of Evidence`) %>%
+         summarise(Count = n()),
+       aes(axis1 = Ecomorphotype,
+           axis2 = `Effect Type`,
+           y = Count)
+) +
+  scale_x_discrete(limits = c("Ecomorphotype",
+                              "Effect Type"),
+                   expand = c(.2, .05)) +
+  # xlab("Demographic") +
+  geom_alluvium(aes(fill = `Strength of Evidence`)) + #
+  # scale_fill_manual(values = c("red", "dodgerblue4", "darkorchid4", "darkorange1", "goldenrod3", "green3")) +
+  geom_stratum() +
+  geom_text(stat = "stratum", aes(label = after_stat(stratum))) + # what does this do?
+  # ggtitle("passengers on the maiden voyage of the Titanic",
+  #         "stratified by demographics and survival") +
+  theme_minimal() %+replace% theme(
+    axis.text = element_text(size = rel(1.5)),
+    axis.title = element_text(size = rel(2)),
+    legend.text = element_text(size = rel(1)),
+    legend.title = element_text(size = rel(1.5)),
+    legend.title.align = 0, # otherwise effect type title centre aligned for some reason
+    plot.background = element_rect(fill = "white", colour = "grey50"), # white background
+    strip.text.x = element_text(size = rel(2)),
+    panel.border = element_rect(colour = "black", fill = NA, size = 1),
+    legend.spacing.x = unit(0, "cm"), # compress spacing between legend items, this is min
+    legend.background = element_blank(),
+    panel.background = element_rect(fill = "white", colour = "grey50"),
+    panel.grid = element_line(colour = "grey90"),
+    legend.key = element_blank()
+  ) # removed whitespace buffer around legend boxes which is nice
+
+ggsave(paste0(saveloc, today(), "_SankeyAlluvial_EMT-EfTyp_Col-SoEv.png"),
+       plot = last_plot(), device = "png", path = "",
+       scale = 2, width = 10, height = 4, units = "in", dpi = 300, limitsize = TRUE)
+
+
+
+# 2bar, PerEMT: EfTyp, EfSiz, col=SoEv####
+for (EMT in levels(emt$Ecomorphotype)) {
+  ggplot(data = emt %>%
+           filter(Ecomorphotype == EMT) %>%
+           # create a Freq column which is a count of all rows with the same attributes for all other columns
+           group_by(`Effect Type`, `Effect Size`, `Strength of Evidence`) %>%
+           summarise(Count = n()),
+         aes(axis1 = `Effect Type`,
+             axis2 = `Effect Size`,
+             y = Count)
+  ) +
+    scale_x_discrete(limits = c("Effect Type",
+                                "Effect Size"),
+                     expand = c(.2, .05)) +
+    # xlab("Demographic") +
+    geom_alluvium(aes(fill = `Strength of Evidence`)) + #
+    # scale_fill_manual(values = c("red", "dodgerblue4", "darkorchid4", "darkorange1", "goldenrod3", "green3")) +
+    geom_stratum() +
+    geom_text(stat = "stratum", aes(label = after_stat(stratum))) + # what does this do?
+    ggtitle(EMT) +
+    theme_minimal() %+replace% theme(
+      axis.text = element_text(size = rel(1.5)),
+      axis.title = element_text(size = rel(2)),
+      legend.text = element_text(size = rel(1)),
+      legend.title = element_text(size = rel(1.5)),
+      legend.title.align = 0, # otherwise effect type title centre aligned for some reason
+      plot.background = element_rect(fill = "white", colour = "grey50"), # white background
+      strip.text.x = element_text(size = rel(2)),
+      panel.border = element_rect(colour = "black", fill = NA, size = 1),
+      legend.spacing.x = unit(0, "cm"), # compress spacing between legend items, this is min
+      legend.background = element_blank(),
+      panel.background = element_rect(fill = "white", colour = "grey50"),
+      panel.grid = element_line(colour = "grey90"),
+      legend.key = element_blank()
+    ) # removed whitespace buffer around legend boxes which is nice
+
+  ggsave(paste0(saveloc, today(), "_SankeyAlluvial_", EMT, "_EfTyp-EfSize_Col-SoEv.png"),
+         plot = last_plot(), device = "png", path = "",
+         scale = 2, width = 10, height = 4, units = "in", dpi = 300, limitsize = TRUE)
+}
+
+
+# 2bar, EMT+EfSz, EfTyp, col=SoEv####
+ggplot(data = emt %>%
+         # join EMT & EffectSize
+         unite(col = "EMT-EfSz", c(Ecomorphotype, `Effect Size`), sep = ": ") %>%
+         group_by(`EMT-EfSz`, `Effect Type`, `Strength of Evidence`) %>%
+         summarise(Count = n()),
+       aes(axis1 = `EMT-EfSz`,
+           axis2 = `Effect Type`,
+           y = Count)) +
+  scale_x_discrete(limits = c("EMT: Effect Size", "Effect Type"), expand = c(.2, .05)) +
+  geom_alluvium(aes(fill = `Strength of Evidence`)) + #
+  geom_stratum() +
+  geom_text(stat = "stratum", aes(label = after_stat(stratum))) + # what does this do?
+  theme_minimal() %+replace% theme(
+    axis.text = element_text(size = rel(1.5)),
+    axis.title = element_text(size = rel(2)),
+    legend.text = element_text(size = rel(1)),
+    legend.title = element_text(size = rel(1.5)),
+    legend.title.align = 0, # otherwise effect type title centre aligned for some reason
+    plot.background = element_rect(fill = "white", colour = "grey50"), # white background
+    strip.text.x = element_text(size = rel(2)),
+    panel.border = element_rect(colour = "black", fill = NA, linewidth = 1),
+    legend.spacing.x = unit(0, "cm"), # compress spacing between legend items, this is min
+    legend.background = element_blank(),
+    panel.background = element_rect(fill = "white", colour = "grey50"),
+    panel.grid = element_line(colour = "grey90"),
+    legend.key = element_blank())
+
+ggsave(paste0(saveloc, today(), "_SankeyAlluvial_EMT.EfSz-EfTyp_Col-SoEv.png"),
+       plot = last_plot(), device = "png", path = "",
+       scale = 2, width = 10, height = 4, units = "in", dpi = 300, limitsize = TRUE)
+
+
+
+
+# 2bar, EMT+SoEv, EfTyp, col=EfSz####
+ggplot(data = emt %>%
+         # join EMT & EffectSize
+         unite(col = "EMT-SoEv", c(Ecomorphotype, `Strength of Evidence`), sep = ": ") %>%
+         group_by(`EMT-SoEv`, `Effect Type`, `Effect Size`) %>%
+         summarise(Count = n()),
+       aes(axis1 = `EMT-SoEv`,
+           axis2 = `Effect Type`,
+           y = Count)) +
+  scale_x_discrete(limits = c("EMT: Strength of Evidence", "Effect Type"), expand = c(.2, .05)) +
+  geom_alluvium(aes(fill = `Effect Size`)) +
+  scale_fill_manual(values = c("black", "blue", "cadetblue1")) +
+  geom_stratum() +
+  geom_text(stat = "stratum", aes(label = after_stat(stratum))) + # what does this do?
+  theme_minimal() %+replace% theme(
+    axis.text = element_text(size = rel(1.5)),
+    axis.title = element_text(size = rel(2)),
+    legend.text = element_text(size = rel(1)),
+    legend.title = element_text(size = rel(1.5)),
+    legend.title.align = 0, # otherwise effect type title centre aligned for some reason
+    plot.background = element_rect(fill = "white", colour = "grey50"), # white background
+    strip.text.x = element_text(size = rel(2)),
+    panel.border = element_rect(colour = "black", fill = NA, linewidth = 1),
+    legend.spacing.x = unit(0, "cm"), # compress spacing between legend items, this is min
+    legend.background = element_blank(),
+    panel.background = element_rect(fill = "white", colour = "grey50"),
+    panel.grid = element_line(colour = "grey90"),
+    legend.key = element_blank())
+
+ggsave(paste0(saveloc, today(), "_SankeyAlluvial_EMT.SoEv-EfTyp_Col-EfSz.png"),
+       plot = last_plot(), device = "png", path = "",
+       scale = 2, width = 10, height = 4, units = "in", dpi = 300, limitsize = TRUE)
+# Archipelagic NA SoE: Tinker et al. 2016, Moxley et al. 2019 [12], and Hughes et al. 2013, Hughes et al. 2019 [15]
+
+
+
+
+
+
+
+# 2023-02-22 FunctionalGroup+Realm####
+# replace EMT with this.
+emt <- read_sheet("https://docs.google.com/spreadsheets/d/1dNDEUENa4M1__VNksolw8Or9ysPutEYWMTgZJ-qOe9I/edit#gid=0") %>%
+  # select cols of interest
+  select(Ecomorphotype, `Functional Group`, Realm, Ecosystem, `Ocean Basin`, `Top-down: Direct Predation: Effect Size`:`Bottom-up: Nutrient Vector Storage: Excretion & Egestion: Strength of Evidence`) %>%
+  # remove NA emt rows
+  drop_na(`Functional Group`, Realm) %>%
+  # convert High Medium Low to 3 2 1, keep NAs
+  mutate(across(
+    .cols = `Top-down: Direct Predation: Effect Size`:`Bottom-up: Nutrient Vector Storage: Excretion & Egestion: Strength of Evidence`,
+    ~ dplyr::case_when(
+      . == "High" ~ 3,
+      . == "Medium" ~ 2,
+      . == "Low" ~ 1
+    )
+  )) %>%
+  # remove rays
+  filter(!Ecomorphotype %in% c("Aquilopelagic", "Rajobenthic")) %>%
+  # Need to parse each row out into multi rows when they have more than 1 effect type/SoE combo
+  # Need 1 column each for effect type, SoE, EMT.
+  tidyr::pivot_longer(cols = contains("Effect Size"),
+                      names_to = "Effect Type",
+                      values_to = "Effect Size") %>%
+  tidyr::pivot_longer(cols = contains("Strength of Evidence"),
+                      names_to = "Effect Type2",
+                      values_to = "Strength of Evidence") %>%
+  # remove ": Effect Size" & ": Strength of Evidence"
+  mutate(`Effect Type` = str_remove_all(string = `Effect Type`, pattern = ": Effect Size"),
+         `Effect Type2` = str_remove_all(string = `Effect Type2`, pattern = ": Strength of Evidence"),
+         # double pivot_longer creates n=effecttype^2 rows, all permutations of both. Collapse to where both match
+         EffectTypesMatch = ifelse(`Effect Type` == `Effect Type2`, TRUE, FALSE),
+         # also want to remove when both are NA later
+         BothNA = ifelse(is.na(`Effect Size`) & is.na(`Strength of Evidence`), TRUE, FALSE),
+         # for plotting, make integer = discrete
+         `Effect Size` = as.integer(`Effect Size`),
+         `Strength of Evidence` = as.integer(`Strength of Evidence`),
+         # so the legend order is logical
+         `Effect Type` = ordered(`Effect Type`,
+                                 levels = c("Top-down: Direct Predation",
+                                            "Top-down: Risk Effects",
+                                            "Top-down: Trophic Cascade",
+                                            "Competition",
+                                            "Bottom-up: Nutrient Vector Storage: Sharks as Food",
+                                            "Bottom-up: Nutrient Vector Storage: Excretion & Egestion"))) %>%
+  # filter for only those that match, remove permutation dupes
+  filter(EffectTypesMatch,
+         # remove where both are NA
+         !BothNA) %>%
+  # Edit Functional Group names
+  mutate(`Functional Group` = case_match(`Functional Group`,
+                                         "Apex sharks" ~ "Macropredatory sharks",
+                                         "Meso sharks / baby apex sharks" ~ "Mesopredatory sharks")) %>%
+  # join columns together
+  unite(col = "FnGpRealm", c(`Functional Group`, Realm), sep = ": ") %>%
+  # # remove temp columns
+  # select(!c(`Effect Type2`, EffectTypesMatch, BothNA)) %>%
+  # keep only columns needed for this plot
+  select(FnGpRealm, `Effect Type`, `Effect Size`, `Strength of Evidence`) %>%
+  # make (ordered) factors for all but Freq. Effect type already done above.
+  mutate(FnGpRealm = ordered(FnGpRealm, levels = c("Macropredatory sharks: Inshore/Shelf",
+                                                   "Macropredatory sharks: Pelagic",
+                                                   "Mesopredatory sharks: Inshore/Shelf",
+                                                   "Mesopredatory sharks: Pelagic")),
+         `Effect Size` = ordered(`Effect Size`, levels = c(3, 2, 1)),
+         `Strength of Evidence` = ordered(`Strength of Evidence`, levels = c(3, 2, 1))) %T>% # note matrittr tee pipe
+  saveRDS(file = paste0(saveloc, today(), "_EMTdataFnGpRealm.rds"))
+
+
+# 2bar, FnGpRealm, EfTyp, col=EfSz####
+ggplot(data = emt %>%
+         group_by(`FnGpRealm`, `Effect Type`, `Effect Size`) %>%
+         summarise(Count = n()),
+       aes(axis1 = `FnGpRealm`,
+           axis2 = `Effect Type`,
+           y = Count)) +
+  scale_x_discrete(limits = c("Functional Group: Realm", "Effect Type"), expand = c(.2, .05)) +
+  geom_alluvium(aes(fill = `Effect Size`)) +
+  scale_fill_manual(values = c("black", "blue", "cadetblue1")) +
+  geom_stratum() +
+  geom_text(stat = "stratum", aes(label = after_stat(stratum))) + # what does this do?
+  theme_minimal() %+replace% theme(
+    axis.text = element_text(size = rel(1.5)),
+    axis.title = element_text(size = rel(2)),
+    legend.text = element_text(size = rel(1)),
+    legend.title = element_text(size = rel(1.5)),
+    legend.title.align = 0, # otherwise effect type title centre aligned for some reason
+    plot.background = element_rect(fill = "white", colour = "grey50"), # white background
+    strip.text.x = element_text(size = rel(2)),
+    panel.border = element_rect(colour = "black", fill = NA, linewidth = 1),
+    legend.spacing.x = unit(0, "cm"), # compress spacing between legend items, this is min
+    legend.background = element_blank(),
+    panel.background = element_rect(fill = "white", colour = "grey50"),
+    panel.grid = element_line(colour = "grey90"),
+    legend.key = element_blank())
+
+ggsave(paste0(saveloc, today(), "_SankeyAlluvial_FnGp.Realm-EfTyp_Col-EfSz.png"),
+       plot = last_plot(), device = "png", path = "",
+       scale = 2, width = 10, height = 4, units = "in", dpi = 300, limitsize = TRUE)
