@@ -1046,23 +1046,27 @@ emt <- read_sheet("https://docs.google.com/spreadsheets/d/1dNDEUENa4M1__VNksolw8
          # for plotting, make integer = discrete
          `Effect Size` = as.integer(`Effect Size`),
          `Strength of Evidence` = as.integer(`Strength of Evidence`),
+         # Edit Functional Group names
+         `Functional Group` = case_match(`Functional Group`,
+                                         "Apex sharks" ~ "Macropredatory sharks",
+                                         "Meso sharks / baby apex sharks" ~ "Mesopredatory sharks"),
+         # Edit Effect Type Group names
+         `Effect Type` = case_match(`Effect Type`,
+                                    "Bottom-up: Nutrient Vector Storage: Sharks as Food" ~ "BU:NVS:SAF",
+                                    "Bottom-up: Nutrient Vector Storage: Excretion & Egestion" ~ "BU:NVS:EAE",
+                                    .default = `Effect Type`),
          # so the legend order is logical
          `Effect Type` = ordered(`Effect Type`,
                                  levels = c("Top-down: Direct Predation",
                                             "Top-down: Risk Effects",
                                             "Top-down: Trophic Cascade",
                                             "Competition",
-                                            "Bottom-up: Nutrient Vector Storage: Sharks as Food",
-                                            "Bottom-up: Nutrient Vector Storage: Excretion & Egestion"))) %>%
+                                            "BU:NVS:SAF",
+                                            "BU:NVS:EAE"))) %>%
   # filter for only those that match, remove permutation dupes
   filter(EffectTypesMatch,
          # remove where both are NA
          !BothNA) %>%
-  # Edit Functional Group names
-  mutate(`Functional Group` = case_match(`Functional Group`,
-                                         "Apex sharks" ~ "Macropredatory sharks",
-                                         "Meso sharks / baby apex sharks" ~ "Mesopredatory sharks")) %>%
-  # join columns together
   unite(col = "FnGpRealm", c(`Functional Group`, Realm), sep = ": ") %>%
   # # remove temp columns
   # select(!c(`Effect Type2`, EffectTypesMatch, BothNA)) %>%
@@ -1078,7 +1082,7 @@ emt <- read_sheet("https://docs.google.com/spreadsheets/d/1dNDEUENa4M1__VNksolw8
   saveRDS(file = paste0(saveloc, today(), "_EMTdataFnGpRealm.rds"))
 
 
-# 2bar, FnGpRealm, EfTyp, col=EfSz####
+# 2bar, FnGpRealm, EfTyp, col=EfSz [usethis]####
 ggplot(data = emt %>%
          group_by(`FnGpRealm`, `Effect Type`, `Effect Size`) %>%
          summarise(Count = n()),
@@ -1086,15 +1090,25 @@ ggplot(data = emt %>%
            axis2 = `Effect Type`,
            y = Count)) +
   scale_x_discrete(limits = c("Functional Group: Realm", "Effect Type"), expand = c(.2, .05)) +
-  geom_alluvium(aes(fill = `Effect Size`)) +
-  scale_fill_manual(values = c("black", "blue", "cadetblue1")) +
-  geom_stratum() +
-  geom_text(stat = "stratum", aes(label = after_stat(stratum))) + # what does this do?
+  geom_alluvium(mapping = aes(fill = `Effect Size`),
+                              alpha = 0.75 # default is 1/2
+                ) +
+  scale_fill_manual(values = c(rgb(0.11, 0.62, 0.47),
+                               rgb(0.46, 0.44, 0.7),
+                               rgb(0.85, 0.37, 0.01))) +
+  # geom_flow() + #just makes everything alpha & greyish?
+  # geom_stratum(width = 1/12, fill = "white", color = "grey") +
+  geom_stratum(width = 1/3) + # default colour black, fill white, width 1/3
+  # geom_label(stat = "stratum", aes(label = after_stat(stratum))) + # label puts in balloon,
+  geom_text(stat = "stratum", aes(label = after_stat(stratum))) + # text just overlays the text. lebel = stringr::str_wrap(after_stat(stratum), 5)
+  # coord_flip() +
+  # ggtitle() +
   theme_minimal() %+replace% theme(
     axis.text = element_text(size = rel(1.5)),
     axis.title = element_text(size = rel(2)),
     legend.text = element_text(size = rel(1)),
     legend.title = element_text(size = rel(1.5)),
+    # legend.position = "none", #to hide legend & put in caption if desired
     legend.title.align = 0, # otherwise effect type title centre aligned for some reason
     plot.background = element_rect(fill = "white", colour = "grey50"), # white background
     strip.text.x = element_text(size = rel(2)),
@@ -1103,8 +1117,16 @@ ggplot(data = emt %>%
     legend.background = element_blank(),
     panel.background = element_rect(fill = "white", colour = "grey50"),
     panel.grid = element_line(colour = "grey90"),
+    panel.grid.major.x = element_blank(),
     legend.key = element_blank())
+
+# shrink axes width: geom_stratum(width) but then lines expand past it
+# todo: wrap text in strata/axes. Turn sideways?  geom_text(angle = 90). Font: family = "Times New Roman"
+ ## could wrap the text itself by addling a line break to specific categories. paste(strwrap(x, ...), collapse = "\n")
+# remove dead space outside plot - margin?
+# nicer colours
+# remove y axis labels & title??
 
 ggsave(paste0(saveloc, today(), "_SankeyAlluvial_FnGp.Realm-EfTyp_Col-EfSz.png"),
        plot = last_plot(), device = "png", path = "",
-       scale = 2, width = 10, height = 4, units = "in", dpi = 300, limitsize = TRUE)
+       scale = 2, width = 6, height = 4, units = "in", dpi = 300, limitsize = TRUE)
