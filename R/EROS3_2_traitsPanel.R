@@ -3,13 +3,13 @@
 
 # library functions ####
 library(tidyverse)
-library(openxlsx)
-library(anytime)
-library(magrittr)
-library(ggplot2)
-library(lubridate)
-library(ggridges)
-library(scales)
+library(openxlsx) # read excel
+library(anytime) # format dates
+library(magrittr) # %<>%
+library(ggplot2) # plot
+library(lubridate) # today
+library(ggridges) # ridge plot
+library(scales) # SI units scales
 
 cutlogzero <- function(
     x = NULL, # numeric vector
@@ -185,7 +185,7 @@ ggsave(paste0(saveloc, today(), "_ridgeplot-MarketGravity-TrophicLevel.png"), pl
        device = "png", path = "", scale = 1, width = 9, height = 5.94, units = "in", dpi = 300, limitsize = TRUE)
 
 
-# MaxTrophic Level: change L45, run lines 29 & 130
+# MaxTrophic Level
 ggplot(MarketGravity.plot, aes(x = TrophicLevelMax, y = MarketGravity, group = MarketGravity)) +
   geom_density_ridges(scale = 2, size = 0.25, rel_min_height = 0.001, alpha = 0.7) + #
   # scale_x_continuous(limits = c(3.6, 4.8), expand = c(0, 0)) +

@@ -43,7 +43,7 @@ emt <- read_sheet("https://docs.google.com/spreadsheets/d/1dNDEUENa4M1__VNksolw8
 #                            range = "A66:J79")
 
 saveloc <- "/home/simon/Documents/Si Work/PostDoc Work/FIU/Ecological Importance of Sharks Workshop/Papers Prep/2022 Science/1_EROS/"
-
+saveloc <- "C:/Users/simon/Documents/Si Work/PostDoc Work/FIU/Ecological Importance of Sharks Workshop/Papers Prep/2022 Science/1_EROS/" # windows
 # https://stackoverflow.com/questions/9917049/inserting-an-image-to-ggplot2
 littoral <- rasterGrob(readPNG(paste0(saveloc, "Graphics/emt_littoral.png")), interpolate = TRUE)
 archipelagic <- rasterGrob(readPNG(paste0(saveloc, "Graphics/emt_archipelagic.png")), interpolate = TRUE)
@@ -1084,6 +1084,14 @@ emt <- read_sheet("https://docs.google.com/spreadsheets/d/1dNDEUENa4M1__VNksolw8
 
 # 2bar, FnGpRealm, EfTyp, col=EfSz [usethis]####
 ggplot(data = emt %>%
+         mutate(FnGpRealm = stringr::str_replace_all(string = FnGpRealm,
+                                                     pattern = "Macropredatory sharks",
+                                                     replacement = "Ma"),
+                FnGpRealm = stringr::str_replace_all(string = FnGpRealm,
+                                                     pattern = "Mesopredatory sharks",
+                                                     replacement = "Me")) %>%
+         tidyr::drop_na(`Effect Type`) %>% # remove leftover row
+         # 2023-10-26 edit labels, FnGpRealm,  Mesopredatory sharks:
          group_by(`FnGpRealm`, `Effect Type`, `Effect Size`) %>%
          summarise(Count = n()),
        aes(axis1 = `FnGpRealm`,
@@ -1120,6 +1128,8 @@ ggplot(data = emt %>%
     panel.grid.major.x = element_blank(),
     legend.key = element_blank())
 
+# ended up blanking out "Ma: Pelagic" in Gimp and replacing with asterix.
+
 # shrink axes width: geom_stratum(width) but then lines expand past it
 # todo: wrap text in strata/axes. Turn sideways?  geom_text(angle = 90). Font: family = "Times New Roman"
  ## could wrap the text itself by addling a line break to specific categories. paste(strwrap(x, ...), collapse = "\n")
@@ -1127,6 +1137,24 @@ ggplot(data = emt %>%
 # nicer colours
 # remove y axis labels & title??
 
+saveloc <- "C:/Users/simon/Documents/Si Work/PostDoc Work/FIU/Ecological Importance of Sharks Workshop/Papers Prep/2022 Science/1_EROS" # windows
+
 ggsave(paste0(saveloc, today(), "_SankeyAlluvial_FnGp.Realm-EfTyp_Col-EfSz.png"),
        plot = last_plot(), device = "png", path = "",
-       scale = 2, width = 6, height = 4, units = "in", dpi = 300, limitsize = TRUE)
+       scale = 2,
+       width = 4, # 6
+       height = 6, # 4
+       units = "in", dpi = 300, limitsize = TRUE)
+
+
+tmp <- emt %>%
+  mutate(FnGpRealm = stringr::str_replace_all(string = FnGpRealm,
+                                              pattern = "Macropredatory sharks",
+                                              replacement = "Ma"),
+         FnGpRealm = stringr::str_replace_all(string = FnGpRealm,
+                                              pattern = "Mesopredatory sharks",
+                                              replacement = "Me")) %>%
+  tidyr::drop_na(`Effect Type`) %>% # remove leftover row
+  # 2023-10-26 edit labels, FnGpRealm,  Mesopredatory sharks:
+  group_by(`FnGpRealm`, `Effect Type`, `Effect Size`) %>%
+  summarise(Count = n())
