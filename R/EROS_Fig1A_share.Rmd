@@ -1,0 +1,118 @@
+---
+title: "EROS_Fig1A_share"
+author: "Erin Dillon"
+date: "2023-11-22"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load libraries
+
+```{r warning=FALSE}
+library(here)
+library(tidyverse)
+library(ggpubr)
+```
+
+
+# Panel i. historical ecology
+
+```{r}
+# read in data
+hist_counts <- read.csv(here::here("fig1A_histecol_share.csv"), header = T, na.strings = ".")
+
+
+# summarize by time period & attach numerical values for plotting (see Dillon et al. 2021 for date justifications and information)
+hist_counts_summary <- hist_counts %>%
+  group_by(time_period) %>%
+  summarize(
+    mean_score = mean(score, na.rm = T),
+    sd_score = sd(score, na.rm = T)
+  ) %>%
+  mutate(time_numeric = case_when( # midpoints
+    time_period == "pre_human" ~ 1200, # dummy
+    time_period == "pre_contact" ~ 1400, # dummy
+    time_period == "colonial" ~ 1661,
+    time_period == "post_colonial" ~ 1863,
+    time_period == "modern_one" ~ 1931,
+    time_period == "modern_two" ~ 1979,
+    time_period == "modern_three" ~ 2010
+  )) %>%
+  mutate(time_period = fct_relevel(time_period, c("pre_human", "pre_contact", "colonial", "post_colonial", "modern_one", "modern_two", "modern_three")))
+```
+
+
+## Plot panel i
+```{r}
+Fig1A_i <- ggplot(hist_counts_summary, aes(x = time_numeric, y = mean_score, group = 1)) +
+  geom_line(size = 0.7, color = "gray2", position = position_dodge(.2), linetype = "dashed") +
+  geom_point(size = 2.5, color = "gray2", position = position_dodge(.2)) +
+  geom_errorbar(aes(ymin = mean_score - sd_score, ymax = mean_score + sd_score), size = 0.6, width = 20, position = position_dodge(.2), color = "gray2") +
+  scale_x_continuous(breaks = c(1200, 1400, 1661, 1863, 1931, 1979, 2010), labels = c(">6 ka", "<1501", "1501–1821", "1822–1903", "1904–1958", "1959–1999", "2000–2020")) +
+  xlab("Time period") +
+  ylab("Ecological state") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 11), axis.title = element_text(size = 14)) +
+  theme(axis.text = element_text(color = "black", family = "sans"), axis.title = element_text(color = "black", family = "sans")) +
+  theme(axis.title.x = element_text(vjust = -0.4)) +
+  theme(axis.text.y = element_text(vjust = 0.3, hjust = 0.9)) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
+  theme(panel.grid.major.x = element_blank(), panel.grid.minor = element_blank()) +
+  theme(panel.grid.major.y = element_line(color = "gray90")) +
+  coord_cartesian(ylim = c(110, 0)) +
+  scale_y_reverse(breaks = c(5, 20, 45, 75, 95, 100), labels = c("Pristine", "Abundant", "Depleted", "Rare", "Ecologically extinct", "Globally extinct")) +
+  theme(aspect.ratio = 0.3)
+Fig1A_i
+```
+
+
+# Panel ii. denticle accumulations
+```{r}
+# read in data
+dd_carib <- read.csv(here::here("fig1A_denticles_share.csv"), header = T, na.strings = ".")
+
+
+# summarize grouped data
+dd_carib_clean <- dd_carib %>%
+  filter(!is.na(total_dd_count)) %>% # filter out NAs so they aren't included in grouped summaries
+  group_by(basin, region, site_name, age_group, sampling_group) %>%
+  summarize(
+    group_dd_total = sum(total_dd_count, na.rm = T),
+    group_sed_weight_kg = sum(sed_weight_kg, na.rm = T),
+    dd_abund = group_dd_total / group_sed_weight_kg,
+    dd_accum = dd_abund / no_years
+  ) %>%
+  distinct()
+```
+
+
+## Plot panel ii
+```{r}
+Fig1A_ii <- ggplot(dd_carib_clean, aes(x = age_group, y = dd_accum)) +
+  geom_point(aes(color = region), alpha = 0.85, size = 2.5, position = position_jitterdodge(jitter.width = 0.3, dodge.width = 0.25, seed = 56)) +
+  geom_boxplot(alpha = 0.35, width = 0.25, outlier.shape = NA) +
+  theme_bw() +
+  labs(y = expression(paste("Shark dermal denticle accumulation (kg sediment"^"-1", " year "^"-1", ")")), x = "Time period", color = "Region") +
+  scale_color_manual(values = c("gray2", "gray75"), labels = c("Caribbean Panama", "Dominican Republic")) +
+  scale_x_discrete(limits = c("Pre-Exploitation", "Sub-Recent"), labels = c("Pre-Human", " Colonial–\nModern")) +
+  theme(axis.text = element_text(size = 11), axis.title = element_text(size = 14)) +
+  theme(legend.text = element_text(size = 11), legend.title = element_text(size = 14)) +
+  theme(axis.text = element_text(color = "black", family = "sans"), axis.title = element_text(color = "black", family = "sans", hjust = 0.5)) +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
+  theme(panel.grid.major.y = element_line(color = "gray90")) +
+  scale_y_continuous(trans = "log10", position = "left") +
+  theme(legend.position = "bottom") +
+  theme(axis.title.x = element_blank()) +
+  theme(aspect.ratio = 0.97)
+Fig1A_ii
+```
+
+
+## Combine panels
+```{r fig.width=8.4, fig.height=2.4}
+Fig1A_combined <- ggarrange(Fig1A_i, Fig1A_ii, ncol = 2, widths = c(2, 1))
+Fig1A_combined
+```
