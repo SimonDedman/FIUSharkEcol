@@ -10,7 +10,7 @@ SankeyAlluvial.R: powers Figure 3B, Sankey/Alluvial plot, uses "/data/SankeyAllu
 
 TraitsRidgeplot.R: powers Figure 5B, traits ridge plot, uses "/data/Traitsridgeplot.xlsx". Written, edited, & packaged by Simon Dedman, simondedman@gmail.com, 2023.
 
-# Counterfactual plots, 1C & 1D
+### Counterfactual plots, 1C & 1D
 
 Code and data to reproduce counterfactual model analyses. Written, edited, & packaged by Natalie Klinnard, natalie.klinard@dal.ca & natalie.klinard@gmail.com, 2023.
 
