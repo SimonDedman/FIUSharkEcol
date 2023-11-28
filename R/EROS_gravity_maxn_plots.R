@@ -1,5 +1,5 @@
 ### Code to produce Figures 1C and 1D in Dedman et al. Ecological roles and importance of sharks in the Anthropocene Ocean.
-
+# Natalie Klinnard, 2023, natalie.klinard@dal.ca, natalie.klinard@gmail.com
 
 library(ggplot2)
 library(tidyr)
