@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/468063603.svg)](https://zenodo.org/doi/10.5281/zenodo.10235359)
+
 # Ecological roles and importance of sharks in the Anthropocene Ocean
 
 Scripts for FIU-led manuscript *Ecological roles and importance of sharks in the Anthropocene Ocean*, Dedman et al 2023/4.
