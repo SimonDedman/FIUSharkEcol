@@ -104,7 +104,8 @@ ggplot(data = emt,
        aes(axis1 = `FnGpRealm`,
            axis2 = `Effect Type`,
            y = Count)) +
-  scale_x_discrete(limits = c("Functional Group: Realm", "Effect Type"), expand = c(.2, .05)) +
+  scale_x_discrete(limits = c("Functional Group: Realm", "Effect Type"), expand = c(0, 0)) + # remove margins
+  scale_y_continuous(expand = c(0, 0)) + # remove margins
   geom_alluvium(mapping = aes(fill = `Effect Size`),
                 alpha = 0.75 # default is 1/2
   ) +
@@ -112,23 +113,25 @@ ggplot(data = emt,
                                rgb(0.46, 0.44, 0.7),
                                rgb(0.85, 0.37, 0.01))) +
   geom_stratum(width = 1/3) + # default colour black, fill white, width 1/3
-  geom_text(stat = "stratum", aes(label = stringr::str_wrap(after_stat(stratum), 16))) + # text just overlays the text. str_wrap wraps to 12 characters wide before newline.
+  geom_text(stat = "stratum",
+            aes(label = stringr::str_wrap(after_stat(stratum), 16)), # text just overlays the text. str_wrap wraps to 12 characters wide before newline.
+            size = 4.5) + # size of text in strata boxes
   theme_minimal() %+replace% theme(
-    axis.text = element_text(size = rel(1.5)),
-    axis.title = element_text(size = rel(2)),
-    legend.text = element_text(size = rel(1)),
-    legend.title = element_text(size = rel(1.5)),
+    axis.text = element_text(size = rel(1.5)), # strata bottom text, y axis numbers
+    axis.title = element_text(size = rel(2)), # "count"
+    legend.text = element_text(size = rel(1.5)),
+    legend.title = element_text(size = rel(2)),
     legend.title.align = 0, # otherwise effect type title centre aligned for some reason
     legend.spacing.x = unit(0, "cm"), # compress spacing between legend items, this is min
     legend.background = element_blank(),
     legend.key = element_blank(),
-    legend.position = c(0.14, 0.9), # dist from left, dist from bottom
+    legend.position = c(0.12, 0.94), # dist from left, dist from bottom
     panel.background = element_rect(fill = "white", colour = "grey50"),
     panel.grid = element_line(colour = "grey90"),
     panel.grid.major.x = element_blank(),
     panel.border = element_rect(colour = "black", fill = NA, linewidth = 1),
     plot.background = element_rect(fill = "white", colour = "grey50"), # white background
-    strip.text.x = element_text(size = rel(2)))
+    plot.margin = unit(c(0, 0, 0, 0.05), "cm")) # T R B L
 
 ggsave(paste0(saveloc, today(), "_SankeyAlluvial_FnGp.Realm-EfTyp_Col-EfSz.png"),
        plot = last_plot(), device = "png", path = "",
