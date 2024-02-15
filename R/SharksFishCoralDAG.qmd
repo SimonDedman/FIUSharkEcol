@@ -1,0 +1,181 @@
+---
+title: "SharksFishCoralDAG"
+author: "Simon Dedman"
+format: html
+editor: visual
+---
+
+## Quarto
+
+Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
+
+## Running Code
+
+When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
+
+```{r}
+1 + 1
+```
+
+You can add options to executable code like this
+
+```{r}
+#| echo: false
+2 * 2
+```
+
+The `echo: false` option disables the printing of code (only output is displayed).
+
+# DAG
+
+## Setup & run DAG
+
+See `?dagitty` for info on how to format this properly.
+
+`x [exposure,pos="1,0"]`
+
+```{r}
+#| echo: false
+remotes::install_github("jtextor/dagitty/r")
+library(dagitty)
+dagitty(x = "dag{
+PctHardCoral [outcome,pos="-0.896,0.994"]
+ApexSharks [pos="-0.613,-1.851"]
+CoralRugosityArea [pos="-0.759,1.443"]
+CrownOfThorns [latent,pos="-1.844,1.177"]
+GrayReefSharks [exposure,pos="-1.389,-1.080"]
+JuvenileSharks [latent,pos="-0.544,-1.044"]
+LRovingPiscivores [outcome,pos="-0.309,-0.576"]
+LSiWPiscivores [outcome,pos="-0.945,-0.604"]
+LTeleostHerbivore [outcome,pos="-1.199,0.125"]
+OffshorePrey [latent,pos="-1.795,-1.407"]
+STeleostHerbivore [outcome,pos="-1.010,0.302"]
+SeaTurtle [latent,pos="0.196,-0.511"]
+BlacktipReefSharks [exposure,pos="-0.179,-1.248"]
+IslandGeomorphology [pos="-2.023,1.611"]
+NutrientRunOff [latent,pos="-1.586,1.381"]
+SicklefinLemonSharks [pos="-1.213,-1.697"]
+SmallBodiedSharks [pos="-1.470,-0.433"]
+SmallPiscivores [outcome,pos="-0.617,-0.405"]
+TeleostSpongivore [outcome,pos="-0.791,0.476"]
+WhitetipReefSharks [pos="-1.962,-0.863"]
+Coralivore [outcome,pos="-0.560,0.466"]
+Grubbers [outcome,pos="-0.197,0.469"]
+Invertivore [outcome,pos="-0.366,0.466"]
+Macroalgae [pos="-1.595,0.792"]
+cyclones [latent,pos="-1.187,1.608"]
+depth [latent,pos="-2.106,-0.337"]
+light [latent,pos="-1.739,-0.110"]
+temperature [pos="-2.066,0.506"]
+turbidity [pos="-2.102,0.071"]
+ApexSharks -> GrayReefSharks
+ApexSharks -> JuvenileSharks
+ApexSharks -> LRovingPiscivores
+ApexSharks -> LSiWPiscivores
+ApexSharks -> BlacktipReefSharks
+ApexSharks -> SmallBodiedSharks
+CrownOfThorns -> PctHardCoral
+CrownOfThorns -> CoralRugosityArea
+GrayReefSharks -> STeleostHerbivore
+GrayReefSharks -> SmallBodiedSharks
+GrayReefSharks -> SmallPiscivores
+GrayReefSharks -> TeleostSpongivore
+GrayReefSharks -> Coralivore
+GrayReefSharks -> Grubbers
+GrayReefSharks -> Invertivore
+GrayReefSharks <-> WhitetipReefSharks
+LRovingPiscivores -> STeleostHerbivore
+LRovingPiscivores -> SmallPiscivores
+LRovingPiscivores -> TeleostSpongivore
+LRovingPiscivores -> Coralivore
+LRovingPiscivores -> Grubbers
+LRovingPiscivores -> Invertivore
+LSiWPiscivores -> STeleostHerbivore
+LSiWPiscivores -> SmallPiscivores
+LSiWPiscivores -> TeleostSpongivore
+LSiWPiscivores -> Coralivore
+LSiWPiscivores -> Grubbers
+LSiWPiscivores -> Invertivore
+OffshorePrey -> GrayReefSharks
+BlacktipReefSharks -> STeleostHerbivore
+BlacktipReefSharks -> SmallPiscivores
+BlacktipReefSharks -> TeleostSpongivore
+BlacktipReefSharks -> Coralivore
+BlacktipReefSharks -> Grubbers
+BlacktipReefSharks -> Invertivore
+IslandGeomorphology -> NutrientRunOff
+NutrientRunOff -> CrownOfThorns
+NutrientRunOff -> Macroalgae
+SicklefinLemonSharks -> GrayReefSharks
+SicklefinLemonSharks -> JuvenileSharks
+SicklefinLemonSharks -> LSiWPiscivores
+SicklefinLemonSharks -> BlacktipReefSharks
+SicklefinLemonSharks -> SmallBodiedSharks
+Macroalgae -> PctHardCoral
+cyclones -> CoralRugosityArea
+depth -> light
+light -> PctHardCoral
+light -> Macroalgae
+temperature -> PctHardCoral
+temperature -> Macroalgae
+turbidity -> light
+}
+",
+layout = TRUE) # automatically generate layout coordinates for each variable (see graphLayout)
+# Error: unexpected string constant in: PctHardCoral [outcome,pos="-0.896,0.994"]  Apex sharks [pos=""
+
+```
+
+# Teleost functional groups
+
+Left join NFF UVC table to Desbiens SM Trophic_Categorisation_Desbiens to add Desbiens Main Diet to NFF species list
+
+```{r}
+#| echo: false
+UVC <- readr::read_csv("/home/simon/Downloads/fixed_fish_uvc_final_2023_02_28.csv")
+Diet <- readr::read_csv("/home/simon/Downloads/Trophic_Categorisation_Desbiens.csv")
+joinReview <- UVC |>
+  dplyr::filter(Family != "Carcharhinidae") |> 
+  dplyr::left_join(Diet |>
+                     dplyr::rename(Diet = "Main Diet") |>
+                     dplyr::select(Species, Diet)
+  ) |> 
+  # tidyr::drop_na(Diet) |> # 129 rows result with this; 285 rows without = 156 species not matched
+  dplyr::select(Species, Feeding.group, Diet) |> 
+  dplyr::group_by(Species) |> 
+  dplyr::summarise(Feeding.group = dplyr::first(Feeding.group),
+                   Diet = dplyr::first(Diet)) # |> 
+                   # dplyr::group_by(Feeding.group, Diet) |> # get numbers of each Feeding.group/Diet combo
+# dplyr::summarise(n = dplyr::n())
+```
+Warning: Detected an unexpected many-to-many relationship between `x` and `y`. Presume Diet has dupes.
+
+```{r}
+#| echo: false
+dupeSpp <- Diet |>
+  dplyr::rename(Diet = "Main Diet") |>
+  dplyr::select(Species, Family, Diet) |> 
+  dplyr::arrange(Species) |> 
+  dplyr::group_by(Species) |> 
+  dplyr::summarise(n = dplyr::n()) |> # find instances where there's >1 entry for the same species
+  dplyr::filter(n > 1) |> 
+  dplyr::pull(Species)
+tmp <- Diet |> 
+  dplyr::rename(Diet = "Main Diet") |>
+  dplyr::filter(Species %in% dupeSpp) |> 
+  dplyr::select(Species, Family, Diet) |> 
+  dplyr::arrange(Species)
+```
+
+Join Family as well as Species
+
+Accept Desbiens Diet for all; where Desbiens NA: check genus, flag to confirm with experts.
+
+```{r}
+#| echo: false
+tmp <- UVC |>
+  dplyr::filter(Family != "Carcharhinidae") |> 
+  dplyr::left_join(Diet |>
+                     dplyr::rename(Diet = "Main Diet") |>
+                     dplyr::select(Species, Diet))
+```
