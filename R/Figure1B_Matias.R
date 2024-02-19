@@ -37,7 +37,7 @@ CumKtch <- FAO.long %>%
 n.others <- length(unique(CumKtch %>% filter(Category == "Other") %>% pull(Country)))
 CumKtch <- CumKtch %>%
   mutate(Category = ifelse(Category == "Other", paste0("Other (", n.others, " countries/territories)"),
-    Category
+                           Category
   ))
 LVLS <- CumKtch %>%
   distinct(Category, LVLS) %>%
@@ -133,16 +133,23 @@ if (eff.transf == "LOG10") {
   p <- p +
     geom_line(data = Agg.eff, aes(x = year, y = log.Effort * coeff, colour = Gear_category), linewidth = 1.1, alpha = 1, linetype = 1) +
     scale_y_continuous(sec.axis = sec_axis(~ . / coeff,
-      name = "Effort (log10) (coloured lines) or CPUE (broken line)",
-      breaks = seq(7, 12, by = 1)
+                                           name = "Effort (log10) (coloured lines) or CPUE (broken line)",
+                                           breaks = seq(7, 12, by = 1)
     ))
 }
 
 # cpue
 p +
-  geom_line(
-    data = CPUE, aes(x = year, y = CPUE.rel * coeff), colour = 1,
-    linewidth = 1.1, alpha = 1, linetype = 2
+  geom_line( # black dashed line
+    data = CPUE |> mutate(Dummy = "CPUE"), # add column for unchanging black colour
+    aes(x = year,
+        y = CPUE.rel * coeff,
+        colour = Dummy
+    ),
+    # colour = 1,
+    linewidth = 1.1,
+    alpha = 1,
+    linetype = 2
   ) +
   theme(
     panel.background = element_blank(),
@@ -164,11 +171,11 @@ p +
   ) +
   guides(colour = guide_legend(nrow = 2)) +
   scale_fill_viridis_d() +
-  scale_color_manual(values = c("cadetblue4", "coral4", "forestgreen", "cornflowerblue", "firebrick1"))
+  scale_color_manual(values = c("cadetblue4", "coral4", "forestgreen", "cornflowerblue", "firebrick1", "black"))
 
 ggsave(paste0(hndl, "Outputs/Figure2c_combined_countries.tiff"),
-  width = 18.4,
-  height = 6.37,
-  units = "cm",
-  dpi = 300, compression = "lzw"
+       width = 18.4,
+       height = 6.37,
+       units = "cm",
+       dpi = 300, compression = "lzw"
 )

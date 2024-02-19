@@ -132,8 +132,8 @@ Left join NFF UVC table to Desbiens SM Trophic_Categorisation_Desbiens to add De
 
 ```{r}
 #| echo: false
-UVC <- readr::read_csv("/home/simon/Downloads/fixed_fish_uvc_final_2023_02_28.csv")
-Diet <- readr::read_csv("/home/simon/Downloads/Trophic_Categorisation_Desbiens.csv")
+UVC <- readr::read_csv("/home/simon/Documents/Si Work/PostDoc Work/FIU/2024-01_SharksFishCoral-FrenchPoly/NFF Data code/fixed_fish_uvc_final_2023_02_28.csv")
+Diet <- readr::read_csv("/home/simon/Documents/Si Work/PostDoc Work/FIU/2024-01_SharksFishCoral-FrenchPoly/NFF Data code/Trophic_Categorisation_Desbiens.csv")
 joinReview <- UVC |>
   dplyr::filter(Family != "Carcharhinidae") |> 
   dplyr::left_join(Diet |>
@@ -160,11 +160,47 @@ dupeSpp <- Diet |>
   dplyr::summarise(n = dplyr::n()) |> # find instances where there's >1 entry for the same species
   dplyr::filter(n > 1) |> 
   dplyr::pull(Species)
-tmp <- Diet |> 
+
+SameSppTwoDiets <- Diet |> 
   dplyr::rename(Diet = "Main Diet") |>
   dplyr::filter(Species %in% dupeSpp) |> 
   dplyr::select(Species, Family, Diet) |> 
   dplyr::arrange(Species)
+
+SamefAMTwoDiets <- Diet |> 
+  dplyr::rename(Diet = "Main Diet") |>
+  dplyr::select(Species, Family, Diet) |> 
+  dplyr::arrange(Species)
+```
+
+List all teleost families
+
+```{r}
+#| echo: false
+teleostFams <- UVC |>
+  dplyr::filter(Family != "Carcharhinidae") |> 
+  dplyr::left_join(Diet |>
+                     dplyr::rename(Diet = "Main Diet") |>
+                     dplyr::select(Species, Diet)) |> 
+  dplyr::group_by(Family, Diet) |> # , Species
+  dplyr::summarise(n = dplyr::n())
+```
+
+List teleost families with >1 nonNA diets
+
+```{r}
+#| echo: false
+teleostFamsTwoDiet <- UVC |>
+  dplyr::filter(Family != "Carcharhinidae") |> 
+  dplyr::left_join(Diet |>
+                     dplyr::rename(Diet = "Main Diet") |>
+                     dplyr::select(Species, Diet)) |> 
+  dplyr::filter(!is.na(Diet)) |> 
+  dplyr::group_by(Family, Diet) |> # , Species
+  dplyr::summarise(n = dplyr::n()) |> 
+  dplyr::group_by(Family) |> # , Species
+  dplyr::summarise(n = dplyr::n()) |> 
+  dplyr::filter(n > 1)
 ```
 
 Join Family as well as Species
