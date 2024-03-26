@@ -1,0 +1,305 @@
+---
+title: "SharksFishCoralDAG"
+author: "Simon Dedman"
+format: html
+editor: visual
+---
+
+## Quarto
+
+Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>. When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this: The `echo: false` option disables the printing of code (only output is displayed).
+
+# Teleost functional groups
+
+Read in data.
+
+```{r}
+#| echo: false
+UVC <- readr::read_csv("/home/simon/Documents/Si Work/PostDoc Work/FIU/2024-01_SharksFishCoral-FrenchPoly/NFF Data code/fixed_fish_uvc_final_2023_02_28.csv") |> 
+  dplyr::filter(!Family %in% c("Carcharhinidae", "Myliobatidae"))
+Diet <- readr::read_csv("/home/simon/Documents/Si Work/PostDoc Work/FIU/2024-01_SharksFishCoral-FrenchPoly/NFF Data code/Trophic_Categorisation_Desbiens.csv") |> 
+  dplyr::rename(Diet = "Main Diet") |> 
+  dplyr::filter(!(Species == "Naso vlamingii" & Diet == "Browser"),
+                !(Species == "Naso annulatus" & Diet == "Browser"),
+                !(Species == "Naso brevirostris" & Diet == "Browser"))
+```
+
+Warning: Detected an unexpected many-to-many relationship between `x` and `y`. Diet has dupes: Choerodon anchorago: invertivore / pursuit piscivore: not in UVC list, ignore Naso vlamingii: browser/planktivore Naso annulatus: same
+
+Join NFF UVC table to Desbiens SM Trophic_Categorisation_Desbiens to add Desbiens Main Diet to NFF species list
+
+```{r}
+#| echo: false
+fish.spp.list <- UVC %>%
+  dplyr::select(c(Species, Family, diet.kulbiki, Feeding.group)) %>%
+  dplyr::group_by(Species) %>%
+  dplyr::distinct() %>%
+  merge(Diet,
+    by = c("Species", "Family"),
+    all.x = TRUE, all.y = FALSE
+  ) %>%
+  dplyr::rename(
+    # uvc.feeding_group = Feeding.group,
+    uvc.diet = diet.kulbiki
+  ) %>%
+  dplyr::mutate(offical_functional_group = Diet) %>%
+  dplyr::mutate(offical_functional_group = ifelse(Feeding.group == "Invertivore" &
+    is.na(Diet),
+  "Invertivore",
+  (ifelse(Feeding.group == "Coralivore" &
+    is.na(Diet),
+  "Coralivore",
+  Diet
+  ))
+  )) %>%
+  dplyr::mutate(offical_functional_group = ifelse(uvc.diet == "Coral" &
+    is.na(offical_functional_group),
+  "Coralivore",
+  offical_functional_group
+  )) %>%
+  dplyr::mutate(offical_functional_group = ifelse(uvc.diet == "Zooplancton" &
+    is.na(offical_functional_group),
+  "Planktivore",
+  offical_functional_group
+  )) %>%
+  dplyr::mutate(offical_functional_group = ifelse(uvc.diet == "Plancton" &
+    is.na(offical_functional_group),
+  "Planktivore",
+  offical_functional_group
+  )) %>%
+  dplyr::mutate(offical_functional_group = ifelse(uvc.diet == "Macroinvertebrates" &
+    is.na(offical_functional_group),
+  "Invertivore",
+  offical_functional_group
+  )) %>%
+  dplyr::mutate(offical_functional_group = ifelse(uvc.diet == "Microinvertebrates" &
+    is.na(offical_functional_group),
+  "Invertivore",
+  offical_functional_group
+  ))
+```
+
+```{r}
+#| echo: false
+dupeSpp <- Diet |>
+  dplyr::select(Species, Family, Diet) |> 
+  dplyr::arrange(Species) |> 
+  dplyr::group_by(Species) |> 
+  dplyr::summarise(n = dplyr::n()) |> # find instances where there's >1 entry for the same species
+  dplyr::filter(n > 1) |> 
+  dplyr::pull(Species)
+
+SameSppTwoDiets <- Diet |> 
+  dplyr::filter(Species %in% dupeSpp) |> 
+  dplyr::select(Species, Family, Diet) |> 
+  dplyr::arrange(Species)
+
+SamefAMTwoDiets <- Diet |> 
+  dplyr::select(Species, Family, Diet) |> 
+  dplyr::arrange(Species)
+```
+
+List all teleost families
+
+```{r}
+#| echo: false
+teleostFams <- fish.spp.list |> 
+  dplyr::group_by(Family, Diet) |> # , Species
+  dplyr::summarise(n = dplyr::n())
+```
+
+List teleost families diets, and those with \>1 nonNA diets
+
+```{r}
+#| echo: false
+library(magrittr)
+fish.spp.list |> 
+  dplyr::filter(!is.na(Diet)) |> 
+  dplyr::group_by(Family, Diet) |> # , Species
+  dplyr::summarise(n = dplyr::n()) |> 
+  dplyr::arrange(Family, desc(n)) %T>% # save intermediary df to object & continue
+  assign(x = "teleostFamsDiet", value = ., pos = 1) %>%
+  dplyr::group_by(Family) |> # , Species
+  dplyr::summarise(n = dplyr::n()) |> 
+  dplyr::filter(n > 1) ->
+  teleostFamsTwoDiet
+```
+
+List teleost families diets, only those with 1 nonNA diet
+
+```{r}
+#| echo: false
+teleostFamsDiet |>
+  dplyr::filter(!Family %in% teleostFamsTwoDiet$Family) ->
+  teleostFamsOneDiet
+```
+
+Add Desbiens diet by family
+
+```{r}
+#| echo: false
+fish.spp.list |>
+  dplyr::left_join(teleostFamsOneDiet |> 
+                     dplyr::rename(FamilyDiet = Diet) |> 
+                     dplyr::select(Family, FamilyDiet)) ->
+  fish.spp.list
+```
+
+Checked Diet against FamilyDiet. Where Diet present, no disagreements from FamilyDiet. Therefore, unite both columns.
+
+```{r}
+#| echo: false
+fish.spp.list |> 
+  # dplyr::select(Family, Species, uvc.diet, Feeding.group, Diet, FamilyDiet, offical_functional_group) |> 
+  # dplyr::rename(OfficialFnGp = offical_functional_group) |> 
+  dplyr::mutate(BothDiet = ifelse(is.na(OfficialFnGp), FamilyDiet, OfficialFnGp)) |> 
+  dplyr::select(!OfficialFnGp) |> 
+  dplyr::rename(OfficialFnGp = BothDiet) |> 
+  # if OfficialFnGp == Coralivore & !is.na(FamilyDiet) : paste FamilyDiet to OfficialFnGp
+  dplyr::mutate(BothDiet = ifelse(OfficialFnGp == "Coralivore" & !is.na(FamilyDiet), FamilyDiet, OfficialFnGp)) |> 
+  dplyr::select(!OfficialFnGp) |> 
+  dplyr::rename(OfficialFnGp = BothDiet) ->
+  fish.spp.list
+  
+```
+
+List teleost families diets, only those with 2+ nonNA diets
+
+```{r}
+#| echo: false
+teleostFamsDiet |>
+  dplyr::filter(Family %in% teleostFamsTwoDiet$Family) ->
+  teleostFamsTwoDiet
+```
+
+some of these are 474:3 in favour of 1 diet type, others nearer 1:1. Join the disproportionate ones: Scaridae 474:3 Scraper Pomacentridae 60:1 Planktivore
+
+```{r}
+#| echo: false
+fish.spp.list  |> 
+  dplyr::mutate(BothDiet = ifelse((is.na(OfficialFnGp) & Family == "Scaridae"), "Scraper", OfficialFnGp)) |> 
+  dplyr::select(!OfficialFnGp) |> 
+  dplyr::rename(OfficialFnGp = BothDiet) |> 
+  dplyr::mutate(BothDiet = ifelse((is.na(OfficialFnGp) & Family == "Pomacentridae"), "Planktivore", OfficialFnGp)) |>
+  dplyr::select(!OfficialFnGp) |> 
+  dplyr::rename(OfficialFnGp = BothDiet) ->
+  fish.spp.list
+  
+```
+
+Lookup missing & coralivores on FishBase/Wiki
+
+```{r}
+#| echo: false
+fish.spp.list  |> 
+  dplyr::filter(is.na(OfficialFnGp)) ->
+  joinReviewFamOutstanding
+
+fish.spp.list  |> 
+  dplyr::filter(OfficialFnGp == "Coralivore") ->
+  Coralivores
+
+write.csv(x = joinReviewFamOutstanding,file = "joinReviewFamOutstanding.csv",row.names = FALSE)
+write.csv(x = Coralivores,file = "Coralivores.csv",row.names = FALSE)
+
+```
+
+Import Official Functional Group manual additions, join with fish.spp.list
+
+```{r}
+#| echo: false
+OFGaddition <- readr::read_csv("/home/simon/Documents/Si Work/PostDoc Work/FIU/2024-01_SharksFishCoral-FrenchPoly/NFF Data code/OfficialFnGp-additions-Coralivores.csv") |> 
+  dplyr::rename(OFG = OfficialFnGp)
+
+fish.spp.list |> 
+  dplyr::left_join(OFGaddition |> 
+                     dplyr::select(Species, OFG)) |> 
+  dplyr::mutate(BothOFG = ifelse(is.na(OfficialFnGp), OFG, OfficialFnGp)) |>
+  dplyr::select(!OfficialFnGp) |> 
+  dplyr::rename(OfficialFnGp = BothOFG) ->
+  fish.spp.list
+
+```
+
+Back-populate Feeding.group from OfficialFnGp in case we use that schema, remove extra columns
+
+```{r}
+#| echo: false
+fish.spp.list[is.na(fish.spp.list$Feeding.group) & fish.spp.list$OfficialFnGp == "Ambush Piscivore", "Feeding.group"] <- "Piscivore"
+fish.spp.list[is.na(fish.spp.list$Feeding.group) & fish.spp.list$OfficialFnGp == "Browser", "Feeding.group"] <- "Herbivore"
+fish.spp.list[is.na(fish.spp.list$Feeding.group) & fish.spp.list$OfficialFnGp == "Coralivore", "Feeding.group"] <- "Coralivore"
+fish.spp.list[is.na(fish.spp.list$Feeding.group) & fish.spp.list$OfficialFnGp == "Grazer", "Feeding.group"] <- "Herbivore"
+fish.spp.list[is.na(fish.spp.list$Feeding.group) & fish.spp.list$OfficialFnGp == "Invertivore", "Feeding.group"] <- "Invertivore"
+fish.spp.list[is.na(fish.spp.list$Feeding.group) & fish.spp.list$OfficialFnGp == "Planktivore" & fish.spp.list$uvc.diet == "Microalgae", "Feeding.group"] <- "Herbivore"
+fish.spp.list[is.na(fish.spp.list$Feeding.group) & fish.spp.list$OfficialFnGp == "Planktivore" & fish.spp.list$uvc.diet == "Zooplancton", "Feeding.group"] <- "Planktivore"
+fish.spp.list[is.na(fish.spp.list$Feeding.group) & fish.spp.list$OfficialFnGp == "Planktivore" & fish.spp.list$uvc.diet == "Coral", "Feeding.group"] <- "Coralivore"
+fish.spp.list[is.na(fish.spp.list$Feeding.group) & fish.spp.list$OfficialFnGp == "Planktivore" & fish.spp.list$uvc.diet == "Plancton", "Feeding.group"] <- "Planktivore"
+fish.spp.list[is.na(fish.spp.list$Feeding.group) & fish.spp.list$OfficialFnGp == "Pursuit Piscivore", "Feeding.group"] <- "Piscivore"
+fish.spp.list[is.na(fish.spp.list$Feeding.group) & fish.spp.list$OfficialFnGp == "Scraper", "Feeding.group"] <- "Herbivore"
+
+fish.spp.list |>
+  dplyr::select(Family, Species, Feeding.group, OfficialFnGp) ->
+  fish.spp.list
+
+write.csv(x = fish.spp.list,
+          file = "/home/simon/Documents/Si Work/PostDoc Work/FIU/2024-01_SharksFishCoral-FrenchPoly/NFF Data code/TeleostDietFnGps.csv",
+          row.names = FALSE)
+```
+
+Load lookup, UVC, and BRUVs master databases, left_join fish.spp.list's Feeding.group & OfficialFnGp to the UVC
+
+```{r}
+#| echo: false
+fish.spp.list <- readr::read_csv("/home/simon/Documents/Si Work/PostDoc Work/FIU/2024-01_SharksFishCoral-FrenchPoly/NFF Data code/TeleostDietFnGps.csv")
+UVC <- readr::read_csv("/home/simon/Documents/Si Work/PostDoc Work/FIU/2024-01_SharksFishCoral-FrenchPoly/NFF Data code/fixed_fish_uvc_final_2023_02_28.csv") |> 
+  dplyr::filter(!Family %in% c("Carcharhinidae", "Myliobatidae")) |> 
+  dplyr::left_join(fish.spp.list |> 
+                     dplyr::rename(FdGpNFF = Feeding.group,
+                                   FdGpDes = OfficialFnGp))
+rm(fish.spp.list)
+BRUV <- readr::read_csv("/home/simon/Documents/Si Work/PostDoc Work/FIU/2024-01_SharksFishCoral-FrenchPoly/NFF Data code/wide.reef.60.ch3.2023.01.csv")
+# |> 
+#   dplyr::filter(!Family %in% c("Carcharhinidae", "Myliobatidae"))
+```
+
+# Standardise UVC & BRUV effort/sampling range/amount
+
+Are these equal sampling rate systems taken for an equal amount of time?
+
+BRUV = 60 mins, n=35, maxn columns, wide UVC = n=6903 multiple species rows for the same datetime combo, long.
+
+In both cases the sampling unit (a specific cell's value) is... 1 hour "viewing the underwater world"?
+
+But one is a static video with bait, The other is a constant-motion (with variance) human-visual swum transect logged.
+
+*What is the equivalent 4D sampling coverage ratio between the two?*
+
+Then apply as multiplication factor to either.
+
+## NFF2024Thesis
+
+### BRUVS
+
+included a GoPro Hero4 Silver or GoPro Hero+ camera mounted to an aluminum frame with a ca. 1.5 m pole that held ca. 1 kg of oily fish bait (yellow fin tuna, small inshore fish, sardines, or fish heads and scraps- typically tuna) in a container in front of the camera. The camera and bait were positioned to face down current, which was determined using dye tabs. BRUVS were deployed during daylight hours on the forereef at 9 - 35 m depth. No two BRUVS were deployed within 500m of one another within a sampling day to reduce autocorrelation. Each BRUVS set had a minimum soak time of 60 minutes, with deployments up to 90 minutes. Each reef had at least 42 sets (Mean =58, Max =70; Appendix S2). At an individual reef, most sets were deployed over a single period of fewer than 10 days (max 37 days). For each set, sea surface temperature (SST) was taken using a YSI (Pro 2030 model), bottom depth recorded, and water visibility was visually estimated to the nearest meter up to 15 meters. I calculated MaxN of each species on each BRUVS set and added these together to calculate overall elasmobranch MaxN for that set.
+
+*How much 4D chronovolume captured?*
+
+What is the volumetric triangle of area covered? Is a temporal function of visibility?
+
+Visibility is a constant per row, therefore can use as part of a multiplication factor which also includes a growing rectangular 3D section through a sphere (for visual curvature). Does BenB do this or take flat surface? In which case the size of the window is a scalar function of the visibility.
+
+Realistically it SHOULD be spherical though because even though the BRUC/screen/monitor may be flat, it's capturing the same depth of visibility in all directions within the vertical & horizontal aperture length/width.
+
+### UVCs
+
+were performed by teams of two people snorkeling along 50 x 2m transects and replicated 4-5 times at each reef (Table 1). Surveys were conducted at a depth of 9 m (SD±0.30). Visual count, speciate, and length estimate.
+
+*How much 4D chronovolume captured?*
+
+# Join UVC & BRUV together (rbound?)
+
+.
+
+# Feed into DAG
+
+.
