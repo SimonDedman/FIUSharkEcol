@@ -634,6 +634,8 @@ ReefWideBRUVUVC <- ReefWideBRUVUVC |>
                                                                     "high rocky" ~ "0",
                                                                     .default = island_geomorphology)))
 # unique(ReefWideBRUVUVC$isl_grp) # 
+ReefWideBRUVUVC[is.na(ReefWideBRUVUVC)] <- 0 # convert NA to 0, for browser
+
 ```
 
 
@@ -660,7 +662,6 @@ write.csv(x = ReefWideBRUVUVC,
           row.names = FALSE)
 
 ReefWideBRUVUVC <- readr::read_csv(file = file.path(root, "ReefWideBRUVUVC.csv"))
-
 ```
 
 # Feed into DAG
