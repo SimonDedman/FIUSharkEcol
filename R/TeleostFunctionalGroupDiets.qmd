@@ -15,9 +15,10 @@ Read in data.
 
 ```{r}
 #| echo: false
-UVC <- readr::read_csv("/home/simon/Documents/Si Work/PostDoc Work/FIU/2024-01_SharksFishCoral-FrenchPoly/NFF Data code/fixed_fish_uvc_final_2023_02_28.csv") |> 
+root <- "/home/simon/Documents/Si Work/PostDoc Work/FIU/2024-01_SharksFishCoral-FrenchPoly/NFF Data code/"
+UVC <- readr::read_csv(file.path(root, "fixed_fish_uvc_final_2023_02_28.csv")) |> 
   dplyr::filter(!Family %in% c("Carcharhinidae", "Myliobatidae"))
-Diet <- readr::read_csv("/home/simon/Documents/Si Work/PostDoc Work/FIU/2024-01_SharksFishCoral-FrenchPoly/NFF Data code/Trophic_Categorisation_Desbiens.csv") |> 
+Diet <- readr::read_csv(file.path(root, "Trophic_Categorisation_Desbiens.csv")) |> 
   dplyr::rename(Diet = "Main Diet") |> 
   dplyr::filter(!(Species == "Naso vlamingii" & Diet == "Browser"),
                 !(Species == "Naso annulatus" & Diet == "Browser"),
@@ -208,7 +209,7 @@ Import Official Functional Group manual additions, join with fish.spp.list
 
 ```{r}
 #| echo: false
-OFGaddition <- readr::read_csv("/home/simon/Documents/Si Work/PostDoc Work/FIU/2024-01_SharksFishCoral-FrenchPoly/NFF Data code/OfficialFnGp-additions-Coralivores.csv") |> 
+OFGaddition <- readr::read_csv(file.path(root, "OfficialFnGp-additions-Coralivores.csv")) |> 
   dplyr::rename(OFG = OfficialFnGp)
 
 fish.spp.list |> 
@@ -242,7 +243,7 @@ fish.spp.list |>
   fish.spp.list
 
 write.csv(x = fish.spp.list,
-          file = "/home/simon/Documents/Si Work/PostDoc Work/FIU/2024-01_SharksFishCoral-FrenchPoly/NFF Data code/TeleostDietFnGps.csv",
+          file = file.path(root, "TeleostDietFnGps.csv"),
           row.names = FALSE)
 ```
 
@@ -250,9 +251,9 @@ Load lookup, UVC, and BRUVs master databases, left_join fish.spp.list's Feeding.
 
 ```{r}
 #| echo: false
-fish.spp.list <- readr::read_csv("/home/simon/Documents/Si Work/PostDoc Work/FIU/2024-01_SharksFishCoral-FrenchPoly/NFF Data code/TeleostDietFnGps.csv")
+fish.spp.list <- readr::read_csv(file.path(root, "TeleostDietFnGps.csv"))
 
-UVC <- readr::read_csv("/home/simon/Documents/Si Work/PostDoc Work/FIU/2024-01_SharksFishCoral-FrenchPoly/NFF Data code/fixed_fish_uvc_final_2023_02_28.csv") |> 
+UVC <- readr::read_csv(file.path(root, "fixed_fish_uvc_final_2023_02_28.csv")) |> 
   dplyr::filter(!Family %in% c("Carcharhinidae", "Myliobatidae")) |> 
   dplyr::left_join(fish.spp.list |> 
                      dplyr::rename(FdGpNFF = Feeding.group,
@@ -265,7 +266,7 @@ UVC <- readr::read_csv("/home/simon/Documents/Si Work/PostDoc Work/FIU/2024-01_S
 
 rm(fish.spp.list)
 
-BRUV <- readr::read_csv("/home/simon/Documents/Si Work/PostDoc Work/FIU/2024-01_SharksFishCoral-FrenchPoly/NFF Data code/wide.reef.60.ch3.2023.01.csv")
+BRUV <- readr::read_csv(file.path(root, "wide.reef.60.ch3.2023.01.csv"))
 ```
 
 # Standardise UVC & BRUV effort/sampling range/amount
@@ -407,8 +408,8 @@ Therefore it's a sphere of radius *Visibility*, reduced by the proportion of vie
 FOV = c(170, 127, 90)
 View = c((1/4) * 3, # 0.75
          (1/16) * 9) # 0.5625
-FOV <- FOV[1] # select 1 2 3 for Ultrawide/Medium/Narrow
-View <- View[1] # select 1 2 for POV 1080 Superview (4:3) / Regular (16:9)
+FOV <- FOV[1] # select 1 2 3 for Ultrawide/Medium/Narrow. NFF says 1
+View <- View[2] # select 1 2 for POV 1080 Superview (4:3) / Regular (16:9). NFF says 2.
 
 BRUV$SampledVolumeM3 <- (4/3) * pi * BRUV$visibility^3 * # 4/3 pi r3, visibility is r 
   (FOV/360) * # width FOV proportion of sphere
@@ -456,6 +457,7 @@ UVC is long & BRUV is wide.
 Need to attach them to the same conceptual unit.
 
 Snapshot: reef. BRUV smallest unit is reef_name, UVC's is UniqueID. Ignore UniqueID and summarise to reef_name
+
 ```{r}
 # lat lon to Add back later. Not needed if joining UVC to BRUV as BRUV already has.
 # UVC |> 
@@ -486,28 +488,43 @@ UVC |>
   UVC
 # rm(reef_latlons)
 ```
+
 Find reef_name mismatches in UVC and BRUV
+
 ```{r}
 unique(BRUV$reef_name)
 unique(UVC$reef_name)
 BRUVonlyReefs <- BRUV$reef_name[!unique(BRUV$reef_name) %in% unique(UVC$reef_name)]
 ```
+
 In BRUV but not UVC:
-Moorea1
-Moorea2
-Moorea3
-Rurutu 1
-Rurutu 2
-Tetiaroa1
-Tetiaroa2
+
+-   Moorea1
+
+-   Moorea2
+
+-   Moorea3
+
+-   Rurutu 1
+
+-   Rurutu 2
+
+-   Tetiaroa1
+
+-   Tetiaroa2
+
 Remove from BRUV?
 
 Any the other way?
+
 ```{r}
 UVConlyReefs <- UVC$reef_name[!unique(UVC$reef_name) %in% unique(BRUV$reef_name)]
 ```
+
 In UVC but not BRUV:
-"Marutea 2"
+
+-   Marutea 2
+
 Remove from UVC?
 
 ```{r}
@@ -518,14 +535,130 @@ BRUV |>
   dplyr::select(archi, isl_grp, site_name, reef_name, latitude, longitude, geo, topo, lagoon.size, Emerged.land.area, depth, Population.size, grav, Season, ave_npp, ave_temp, visibility, vid_length, SampledVolumeM3, SampledVolumeM3min, time.no.bait, everything()) -> ReefWideBRUVUVC
 
 write.csv(x = ReefWideBRUVUVC,
-          file =  "/home/simon/Documents/Si Work/PostDoc Work/FIU/2024-01_SharksFishCoral-FrenchPoly/NFF Data code/ReefWideBRUVUVC.csv",
+          file =  file.path(root, "ReefWideBRUVUVC.csv"),
           row.names = FALSE)
 write.csv(x = UVC,
-          file =  "/home/simon/Documents/Si Work/PostDoc Work/FIU/2024-01_SharksFishCoral-FrenchPoly/NFF Data code/UVC.csv",
+          file =  file.path(root, "UVC.csv"),
           row.names = FALSE)
 write.csv(x = BRUV,
-          file =  "/home/simon/Documents/Si Work/PostDoc Work/FIU/2024-01_SharksFishCoral-FrenchPoly/NFF Data code/BRUV.csv",
+          file =  file.path(root, "BRUV.csv"),
           row.names = FALSE)
+```
+
+# Check we have all variables needed for DAG in dbase
+
+```{r}
+ReefWideBRUVUVC <- readr::read_csv(file = file.path(root, "ReefWideBRUVUVC.csv"))
+BRUV <- readr::read_csv(file = file.path(root, "BRUV.csv"))
+UVC <- readr::read_csv(file = file.path(root, "UVC.csv"))
+```
+
+Missing:
+
+-   Crustose Coraline Algae
+-   Hard.Coral
+-   Other.Algae
+-   Relief
+
+All in bethic_sum_reef_2023_02_26.csv ?
+
+```{r}
+Benthic <- readr::read_csv(file = file.path(root, "bethic_sum_reef_2023_02_26.csv"))
+ReefWideBRUVUVC |> dplyr::left_join(Benthic) -> ReefWideBRUVUVC # add Benthic variables
+
+```
+# Clean/Align names, join apex / Transient.pelagic.sharks
+
+```{r}
+ReefWideBRUVUVC |>
+  dplyr::rename(Sicklefin.lemon.shark = Lemon.shark,
+                Island.geomorphology = topo,
+                Crustose.coraline.algae = CCA) |>
+  dplyr::mutate(Transient.pelagic.sharks = Great.hammerhead.shark + Common.Blacktip.shark + Scalloped.hammerhead.shark + Tiger.shark) |> 
+  dplyr::select(1:Tiger.shark, Transient.pelagic.sharks, tidyselect::everything()) -> ReefWideBRUVUVC
+
+# save block
+write.csv(x = ReefWideBRUVUVC,
+          file =  file.path(root, "ReefWideBRUVUVC.csv"),
+          row.names = FALSE)
+ReefWideBRUVUVC <- readr::read_csv(file = file.path(root, "ReefWideBRUVUVC.csv"))
+```
+
+# Remove all columns not to be used in the DAG
+
+```{r remove columns}
+ReefWideBRUVUVC <- ReefWideBRUVUVC |>
+  dplyr::mutate(pop.dens = Population.size / Emerged.land.area) |> 
+  dplyr::select(
+    # isl_grp,# "east tuamotu" "west tuamotu" "leeward"      "marquesas"    "windward"     "australes"
+    # Mark as unobserved since it's a proxy for latlon and they're its only parents.
+    latitude,
+    longitude,
+    Island.geomorphology:Emerged.land.area,
+    Population.size,
+    pop.dens, # added above
+    Season:ave_temp,
+    Whitetip.reef.shark:Sicklefin.lemon.shark,
+    Silvertip.shark,
+    Transient.pelagic.sharks,
+    AmbushPiscivore_SppNoMean:Scraper_SppNoMean,
+    Relief,
+    Other.Algae:Crustose.coraline.algae,
+    Invert
+  ) |>
+  # Remove _SppNoMean from BRUV teleost abundances
+  dplyr::rename_with(.cols = tidyselect::ends_with("_SppNoMean"),
+                     .fn = ~ sub("_SppNoMean$", "", .x)) |>
+  # Rename columns: underscores & nocaps
+  dplyr::rename_with(~ tolower(gsub(".", "_", .x, fixed = TRUE))) |> 
+  # underscores for piscivores
+  dplyr::rename(ambush_piscivore = ambushpiscivore,
+                pursuit_piscivore = pursuitpiscivore)
+```
+
+
+# Convert character columns
+Only need to do this for columns/variables we're using in the DAG
+```{r convert columns}
+ReefWideBRUVUVC <- ReefWideBRUVUVC |>
+  dplyr::mutate(season = as.numeric(dplyr::case_match(season, # "Dry" "Wet"
+                                                      "Wet" ~ "0", 
+                                                      "Dry" ~ "1",
+                                                      .default = season)),
+                island_geomorphology = as.numeric(dplyr::case_match(island_geomorphology, # "open atoll"   "near atoll"   "closed atoll" "high rocky"   "high barrier"
+                                                                    "open atoll" ~ "1", 
+                                                                    "closed atoll" ~ "0.75",
+                                                                    "near atoll" ~ "0.5",
+                                                                    "high barrier" ~ "0.25",
+                                                                    "high rocky" ~ "0",
+                                                                    .default = island_geomorphology)))
+# unique(ReefWideBRUVUVC$isl_grp) # 
+```
+
+
+# Standardise
+Nat: make function & apply
+
+```{r}
+stdize <- function(x) { # centre around mean, scale to SD, then rescale to 0:1
+  x <- (x - mean(x, na.rm = TRUE)) / (sd(x, na.rm = TRUE)) # centre & scale to SD
+  x <- x - min(x, na.rm = TRUE) # shift so min is 0
+  x <- x / max(x, na.rm = TRUE) # scale so max is 1
+  return(x)
+}
+
+# apply function
+ReefWideBRUVUVC <- as.data.frame(lapply(ReefWideBRUVUVC[, ], stdize))
+
+# replace NAs with random uniformly-distributed data otherwise rows have to be removed or whole variable marked as unobserved
+ReefWideBRUVUVC$browser[is.na(ReefWideBRUVUVC$browser)] <- runif(n = length(ReefWideBRUVUVC$browser[is.na(ReefWideBRUVUVC$browser)]), 0, 1)
+
+# save block
+write.csv(x = ReefWideBRUVUVC,
+          file =  file.path(root, "ReefWideBRUVUVC.csv"),
+          row.names = FALSE)
+
+ReefWideBRUVUVC <- readr::read_csv(file = file.path(root, "ReefWideBRUVUVC.csv"))
 
 ```
 

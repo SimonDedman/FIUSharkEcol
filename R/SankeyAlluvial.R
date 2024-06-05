@@ -115,7 +115,8 @@ ggplot(data = emt,
   geom_stratum(width = 1/3) + # default colour black, fill white, width 1/3
   geom_text(stat = "stratum",
             aes(label = stringr::str_wrap(after_stat(stratum), 16)), # text just overlays the text. str_wrap wraps to 12 characters wide before newline.
-            size = 4.5) + # size of text in strata boxes
+            size = 5.5, # size of text in strata boxes, was 4.5
+            lineheight = 0.75) + # adjust spacing between lines
   theme_minimal() %+replace% theme(
     axis.text = element_text(size = rel(1.5)), # strata bottom text, y axis numbers
     axis.title = element_text(size = rel(2)), # "count"

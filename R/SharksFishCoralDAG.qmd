@@ -5,110 +5,325 @@ format: html
 editor: visual
 ---
 
-# Load data
-```{r}
-ReefWideBRUVUVC <-  readr::read_csv(file =  "/home/simon/Documents/Si Work/PostDoc Work/FIU/2024-01_SharksFishCoral-FrenchPoly/NFF Data code/ReefWideBRUVUVC.csv")
-```
-Between BRUV+UVC combined and running DAG, surely I need to get all other variables, do I have them all?
-
-See https://docs.google.com/spreadsheets/d/1x7GLAVqXHQXAk9JVcsNAaS7aMi1AQ-DO/edit#gid=750764017
-
-# DAG
-
-## Setup & run DAG
-
-See `?dagitty` for info on how to format this properly.
-
-`x [exposure,pos="1,0"]`
-
-```{r}
+```{r install library dagitty}
 #| echo: false
+# install.packages("dagitty")
 remotes::install_github("jtextor/dagitty/r")
 library(dagitty)
-dagitty(x = "dag{
-PctHardCoral [outcome,pos="-0.896,0.994"]
-ApexSharks [pos="-0.613,-1.851"]
-CoralRugosityArea [pos="-0.759,1.443"]
-CrownOfThorns [latent,pos="-1.844,1.177"]
-GrayReefSharks [exposure,pos="-1.389,-1.080"]
-JuvenileSharks [latent,pos="-0.544,-1.044"]
-LRovingPiscivores [outcome,pos="-0.309,-0.576"]
-LSiWPiscivores [outcome,pos="-0.945,-0.604"]
-LTeleostHerbivore [outcome,pos="-1.199,0.125"]
-OffshorePrey [latent,pos="-1.795,-1.407"]
-STeleostHerbivore [outcome,pos="-1.010,0.302"]
-SeaTurtle [latent,pos="0.196,-0.511"]
-BlacktipReefSharks [exposure,pos="-0.179,-1.248"]
-IslandGeomorphology [pos="-2.023,1.611"]
-NutrientRunOff [latent,pos="-1.586,1.381"]
-SicklefinLemonSharks [pos="-1.213,-1.697"]
-SmallBodiedSharks [pos="-1.470,-0.433"]
-SmallPiscivores [outcome,pos="-0.617,-0.405"]
-TeleostSpongivore [outcome,pos="-0.791,0.476"]
-WhitetipReefSharks [pos="-1.962,-0.863"]
-Coralivore [outcome,pos="-0.560,0.466"]
-Grubbers [outcome,pos="-0.197,0.469"]
-Invertivore [outcome,pos="-0.366,0.466"]
-Macroalgae [pos="-1.595,0.792"]
-cyclones [latent,pos="-1.187,1.608"]
-depth [latent,pos="-2.106,-0.337"]
-light [latent,pos="-1.739,-0.110"]
-temperature [pos="-2.066,0.506"]
-turbidity [pos="-2.102,0.071"]
-ApexSharks -> GrayReefSharks
-ApexSharks -> JuvenileSharks
-ApexSharks -> LRovingPiscivores
-ApexSharks -> LSiWPiscivores
-ApexSharks -> BlacktipReefSharks
-ApexSharks -> SmallBodiedSharks
-CrownOfThorns -> PctHardCoral
-CrownOfThorns -> CoralRugosityArea
-GrayReefSharks -> STeleostHerbivore
-GrayReefSharks -> SmallBodiedSharks
-GrayReefSharks -> SmallPiscivores
-GrayReefSharks -> TeleostSpongivore
-GrayReefSharks -> Coralivore
-GrayReefSharks -> Grubbers
-GrayReefSharks -> Invertivore
-GrayReefSharks <-> WhitetipReefSharks
-LRovingPiscivores -> STeleostHerbivore
-LRovingPiscivores -> SmallPiscivores
-LRovingPiscivores -> TeleostSpongivore
-LRovingPiscivores -> Coralivore
-LRovingPiscivores -> Grubbers
-LRovingPiscivores -> Invertivore
-LSiWPiscivores -> STeleostHerbivore
-LSiWPiscivores -> SmallPiscivores
-LSiWPiscivores -> TeleostSpongivore
-LSiWPiscivores -> Coralivore
-LSiWPiscivores -> Grubbers
-LSiWPiscivores -> Invertivore
-OffshorePrey -> GrayReefSharks
-BlacktipReefSharks -> STeleostHerbivore
-BlacktipReefSharks -> SmallPiscivores
-BlacktipReefSharks -> TeleostSpongivore
-BlacktipReefSharks -> Coralivore
-BlacktipReefSharks -> Grubbers
-BlacktipReefSharks -> Invertivore
-IslandGeomorphology -> NutrientRunOff
-NutrientRunOff -> CrownOfThorns
-NutrientRunOff -> Macroalgae
-SicklefinLemonSharks -> GrayReefSharks
-SicklefinLemonSharks -> JuvenileSharks
-SicklefinLemonSharks -> LSiWPiscivores
-SicklefinLemonSharks -> BlacktipReefSharks
-SicklefinLemonSharks -> SmallBodiedSharks
-Macroalgae -> PctHardCoral
-cyclones -> CoralRugosityArea
+# https://dagitty.net/dags.html?id=JHVro8aM 2024-05-24
+myDag <- dagitty('dag {
+ambush_piscivore [pos="-0.876,-1.268"]
+ave_npp [pos="-0.927,0.696"]
+ave_temp [pos="-0.890,1.097"]
+bed_shear_stress [latent,pos="-0.963,1.079"]
+blacktip_reef_shark [pos="-0.970,-1.278"]
+browser [latent,pos="-0.771,-0.705"]
+cloud_cover [latent,pos="-0.785,1.464"]
+common_blacktip_shark [latent,pos="-0.962,-2.393"]
+coral_spawning [latent,pos="-1.250,0.392"]
+crown_of_thorns [latent,pos="-1.147,-0.199"]
+crustose_coraline_algae [pos="-0.923,0.349"]
+cyclones [latent,pos="-1.113,1.307"]
+depth [latent,pos="-0.838,1.489"]
+emerged_land_area [pos="-0.883,1.585"]
+grazer [pos="-0.893,-0.705"]
+great_hammerhead_shark [latent,pos="-0.785,-2.397"]
+grey_reef_shark [exposure,pos="-1.206,-1.756"]
+hard_coral [outcome,pos="-1.030,-0.171"]
+invert [pos="-1.103,0.007"]
+invertivore [pos="-1.108,-0.673"]
+isl_grp [pos="-1.042,1.753"]
+island_geomorphology [pos="-0.970,1.724"]
+lagoon_size [pos="-1.086,1.471"]
+latitude [pos="-1.104,1.716"]
+light [latent,pos="-0.765,1.037"]
+longitude [pos="-1.090,1.884"]
+nutrient_run_off [latent,pos="-1.076,1.247"]
+offshore_prey [latent,pos="-1.301,-0.762"]
+other_algae [pos="-0.825,0.260"]
+other_offshore_prey_proxies [latent,pos="-1.283,-0.470"]
+planktivore [pos="-1.203,-0.701"]
+pop_dens [pos="-0.711,0.242"]
+population_size [pos="-0.720,0.716"]
+pursuit_piscivore [pos="-0.779,-1.271"]
+relief [pos="-1.123,0.674"]
+scalloped_hammerhead_shark [latent,pos="-1.092,-2.397"]
+scraper [pos="-1.003,-0.698"]
+season [pos="-0.720,1.543"]
+sicklefin_lemon_shark [pos="-1.095,-2.097"]
+silvertip_shark [latent,pos="-0.753,-1.802"]
+tawny_nurse_shark [pos="-1.067,-1.285"]
+tiger_shark [latent,pos="-0.879,-2.400"]
+transient_pelagic_sharks [pos="-0.933,-2.078"]
+turbidity [latent,pos="-0.773,0.592"]
+wave_exposure [latent,pos="-0.953,1.322"]
+whitetip_reef_shark [pos="-1.168,-1.385"]
+zooplankton [pos="-1.210,0.096"]
+ambush_piscivore -> browser
+ambush_piscivore -> grazer
+ambush_piscivore -> invertivore
+ambush_piscivore -> planktivore
+ambush_piscivore -> scraper
+ave_npp -> crustose_coraline_algae
+ave_npp -> hard_coral
+ave_npp -> invert
+ave_npp -> offshore_prey
+ave_npp -> turbidity
+ave_npp -> zooplankton
+ave_temp -> ave_npp
+ave_temp -> crustose_coraline_algae
+ave_temp -> hard_coral
+ave_temp -> offshore_prey
+ave_temp -> other_algae
+bed_shear_stress -> crustose_coraline_algae
+bed_shear_stress -> relief
+blacktip_reef_shark -> browser
+blacktip_reef_shark -> grazer
+blacktip_reef_shark -> invertivore
+blacktip_reef_shark -> planktivore
+blacktip_reef_shark -> scraper
+browser -> other_algae
+cloud_cover -> light
+common_blacktip_shark -> transient_pelagic_sharks
+crown_of_thorns -> hard_coral
+crustose_coraline_algae -> hard_coral
+cyclones -> relief
+depth -> bed_shear_stress
 depth -> light
-light -> PctHardCoral
-light -> Macroalgae
-temperature -> PctHardCoral
-temperature -> Macroalgae
-turbidity -> light
-}
-",
-layout = TRUE) # automatically generate layout coordinates for each variable (see graphLayout)
-# Error: unexpected string constant in: PctHardCoral [outcome,pos="-0.896,0.994"]  Apex sharks [pos=""
+depth -> wave_exposure
+emerged_land_area -> nutrient_run_off
+emerged_land_area -> pop_dens
+grazer -> crustose_coraline_algae
+grazer -> other_algae
+great_hammerhead_shark -> transient_pelagic_sharks
+grey_reef_shark -> ambush_piscivore
+grey_reef_shark -> browser
+grey_reef_shark -> grazer
+grey_reef_shark -> invertivore
+grey_reef_shark -> offshore_prey
+grey_reef_shark -> planktivore
+grey_reef_shark -> pursuit_piscivore
+grey_reef_shark -> scraper
+hard_coral -> coral_spawning
+invertivore -> invert
+invertivore -> other_algae
+isl_grp -> island_geomorphology
+isl_grp -> light
+island_geomorphology -> ave_npp
+island_geomorphology -> bed_shear_stress
+island_geomorphology -> emerged_land_area
+island_geomorphology -> lagoon_size
+island_geomorphology -> nutrient_run_off
+island_geomorphology -> offshore_prey
+lagoon_size -> nutrient_run_off
+latitude -> cyclones
+latitude -> isl_grp
+latitude -> light
+light -> ave_npp
+light -> ave_temp
+light -> turbidity
+longitude -> isl_grp
+nutrient_run_off -> ave_npp
+nutrient_run_off -> crown_of_thorns
+nutrient_run_off -> crustose_coraline_algae
+nutrient_run_off -> other_algae
+nutrient_run_off -> turbidity
+other_algae -> hard_coral
+other_offshore_prey_proxies -> offshore_prey
+planktivore -> coral_spawning
+pop_dens -> ambush_piscivore
+pop_dens -> browser
+pop_dens -> grazer
+pop_dens -> hard_coral
+pop_dens -> invertivore
+pop_dens -> nutrient_run_off
+pop_dens -> offshore_prey
+pop_dens -> planktivore
+pop_dens -> pursuit_piscivore
+pop_dens -> scraper
+population_size -> pop_dens
+pursuit_piscivore -> browser
+pursuit_piscivore -> grazer
+pursuit_piscivore -> invertivore
+pursuit_piscivore -> planktivore
+pursuit_piscivore -> scraper
+relief -> browser
+relief -> grazer
+relief -> hard_coral
+relief -> invert
+relief -> invertivore
+relief -> planktivore
+relief -> scraper
+scalloped_hammerhead_shark -> transient_pelagic_sharks
+scraper -> crustose_coraline_algae
+scraper -> hard_coral
+scraper -> other_algae
+season -> ave_temp
+season -> cloud_cover
+season -> light
+sicklefin_lemon_shark -> ambush_piscivore
+sicklefin_lemon_shark -> blacktip_reef_shark
+sicklefin_lemon_shark -> grey_reef_shark
+sicklefin_lemon_shark -> offshore_prey
+sicklefin_lemon_shark -> pursuit_piscivore
+sicklefin_lemon_shark -> silvertip_shark
+sicklefin_lemon_shark -> tawny_nurse_shark
+sicklefin_lemon_shark -> whitetip_reef_shark
+silvertip_shark -> ambush_piscivore
+silvertip_shark -> browser
+silvertip_shark -> grazer
+silvertip_shark -> invertivore
+silvertip_shark -> offshore_prey
+silvertip_shark -> planktivore
+silvertip_shark -> pursuit_piscivore
+silvertip_shark -> scraper
+tawny_nurse_shark -> browser
+tawny_nurse_shark -> grazer
+tawny_nurse_shark -> invertivore
+tawny_nurse_shark -> planktivore
+tawny_nurse_shark -> scraper
+tiger_shark -> transient_pelagic_sharks
+transient_pelagic_sharks -> ambush_piscivore
+transient_pelagic_sharks -> blacktip_reef_shark
+transient_pelagic_sharks -> grey_reef_shark
+transient_pelagic_sharks -> offshore_prey
+transient_pelagic_sharks -> pursuit_piscivore
+transient_pelagic_sharks -> silvertip_shark
+transient_pelagic_sharks -> tawny_nurse_shark
+transient_pelagic_sharks -> whitetip_reef_shark
+turbidity -> crustose_coraline_algae
+turbidity -> hard_coral
+turbidity -> other_algae
+wave_exposure -> bed_shear_stress
+whitetip_reef_shark -> browser
+whitetip_reef_shark -> grazer
+whitetip_reef_shark -> invertivore
+whitetip_reef_shark -> planktivore
+whitetip_reef_shark -> scraper
+zooplankton -> planktivore
+}')
 
+plot(myDag)
+impliedConditionalIndependencies(myDag)
+# Things involving island geomorphology:
+Isl_ _||_ amb_ | pp_d
+ciTest( "island_geomorphology", "ambush_piscivore", "pop_dens",
+        data = ReefWideBRUVUVC,
+        type = "cis.chisq") # FAILS
+Isl_ _||_ amb_ | em__
+ciTest("island_geomorphology", "ambush_piscivore", "emerged_land_area",
+        data = ReefWideBRUVUVC,
+        type = "cis.chisq") # FAILS
+Isl_ _||_ av_t | isl_
+Isl_ _||_ bl__
+Isl_ _||_ brws | pp_d, relf
+Isl_ _||_ brws | em__, relf
+Isl_ _||_ grzr | pp_d, relf
+Isl_ _||_ grzr | em__, relf
+Isl_ _||_ gr__
+Isl_ _||_ invert | av_n, invrtv, relf
+Isl_ _||_ invr | av_n, pp_d, relf
+Isl_ _||_ invr | pp_d, relf
+Isl_ _||_ invr | em__, relf
+Isl_ _||_ lttd | isl_
+Isl_ _||_ lngt | isl_
+Isl_ _||_ plnk | pp_d, relf, zpln
+Isl_ _||_ plnk | av_n, pp_d, relf
+Isl_ _||_ pp_d | em__
+Isl_ _||_ ppl_
+Isl_ _||_ prs_ | pp_d
+Isl_ _||_ prs_ | em__
+Isl_ _||_ scrp | pp_d, relf
+Isl_ _||_ scrp | em__, relf
+Isl_ _||_ sesn
+ciTest("island_geomorphology", "season",
+        data = ReefWideBRUVUVC,
+        type = "cis.chisq") # FAILS
+Isl_ _||_ sc__
+Isl_ _||_ tw__
+Isl_ _||_ tr__
+Isl_ _||_ wh__
+Isl_ _||_ zpln | av_n
+
+wh__ _||_ zpln
+ciTest( "whitetip_reef_shark", "zooplankton",
+        data = ReefWideBRUVUVC,
+        type = "cis.chisq") # FAILS
+# zooplankton marked as observed in DAG but not present in dbase why?
+
+sesn _||_ wh__
+ciTest("season", "whitetip_reef_shark",
+        data = ReefWideBRUVUVC,
+        type = "cis.chisq") # FAILS
+
+ciTest("site_name", "reef_name",
+        data = ReefWideBRUVUVC,
+        type = "cis.chisq") # FAILS
+
+# brca.txt (download at: https://github.com/ankurankan/2020-dagitty-manual/)
+brca <- read.table("/home/simon/Documents/Si Work/PostDoc Work/FIU/2024-01_SharksFishCoral-FrenchPoly/Nat resources/Ankan/brca.txt",
+                   header = TRUE)
+ciTest("Age", "Recurrence", c("Irradiation", "Menopause"),
+       data = brca,
+       type = "cis.chisq")
+
+ciTest("geo", "island_geomorphology",
+       data = ReefWideBRUVUVC,
+       type = "cis.chisq") # FAILS
+
+tmp <- ReefWideBRUVUVC |> 
+  dplyr::select(geo, island_geomorphology)
+
+ciTest("geo", "island_geomorphology",
+       data = tmp,
+       type = "cis.chisq") # FAILS
+
+xtfrm.data.frame(brca$Recurrence) # fails
 ```
+
+```{r load data}
+ReefWideBRUVUVC <-  readr::read_csv(file =  "/home/simon/Documents/Si Work/PostDoc Work/FIU/2024-01_SharksFishCoral-FrenchPoly/NFF Data code/ReefWideBRUVUVC.csv")
+# download specified DAG from dagitty.net
+# DAG <- downloadGraph("dagitty.net/mt8WHQajL") # https://dagitty.net/mt8WHQajL
+```
+
+Between BRUV+UVC combined and running DAG, surely I need to get all other variables, do I have them all? See https://docs.google.com/spreadsheets/d/1x7GLAVqXHQXAk9JVcsNAaS7aMi1AQ-DO/edit#gid=750764017
+
+See `?dagitty` for info on how to format this properly. `x [exposure,pos="1,0"]`
+
+# define variables for protected area, fire, poaching, logging, distance to roads and cities, slope, elevation, carbon sequestration and forest species abundance
+
+def \<- defData(varname = "slope", dist = "normal", formula = 0, variance = 1) def \<- defData(def, varname = "elevation", dist = "normal", formula = 0, variance = 1) def \<- defData(def, varname = "distancetoroadsandcities", dist = "normal", formula = 0, variance = 1) def \<- defData(def, varname = "protectedarea", dist = "binary", formula = "0.9 \* slope + 0.9 \* elevation + -1.2 \* distancetoroadsandcities", link = "logit", variance = 1) def \<- defData(def, varname = "fire", dist = "normal", formula = "-0.5 \* protectedarea + 0.6 \* distancetoroadsandcities", variance = 1) def \<- defData(def, varname = "poaching", dist = "normal", formula = "-1.1 \* protectedarea + 0.8 \* distancetoroadsandcities", variance = 1) def \<- defData(def, varname = "logging", dist = "normal", formula = "-0.7 \* slope + -0.7 \* elevation + -1.6 \* protectedarea + 0.6 \* distancetoroadsandcities", variance = 1) def \<- defData(def, varname = "forestspeciesabundance", dist = "normal", formula = "-0.4 \* fire + -0.6 \* poaching + -0.7 \* logging", variance = 1) def \<- defData(def, varname = "carbonsequestration", dist = "normal", formula = "-0.8 \* logging + 0.4 \* forestspeciesabundance", variance = 1)
+
+# create 10000 observations
+
+ForestSpeciesAbundanceData \<- genData(10000, def)
+
+# Test DAG-data consistency
+
+# evaluate the d-separation implications of our DAG with our simulated dataset
+
+```{r DAG data consistency}
+test <- localTests(x = myDag,
+                   data = ReefWideBRUVUVC,
+                   type = "cis",
+                   abbreviate.names = FALSE)
+# Warning in cov2cor(cov(data)): diag(.) had 0 or NA entries; non-finite result is doubtful
+# Error in sample.cov[vars, vars] : subscript out of bounds
+# > traceback()
+# 7: .ci.test.covmat(sample.cov, sample.nobs, i, conf.level, tol)
+# 6: FUN(X[[i]], ...)
+# 5: lapply(X = X, FUN = FUN, ...)
+# 4: sapply(tests, f)
+# 3: t(sapply(tests, f))
+# 2: as.data.frame(row.names = row.names, t(sapply(tests, f)))
+# 1: localTests(x = myDag, data = ReefWideBRUVUVC, type = "cis")
+
+print(test)
+```
+
+# perform Holm-Bonferrino correction to mitigate problems around multiple testing
+
+test$p.value <- p.adjust(test$p.value)
+
+test \# should show all p values above 0.05, suggesting DAG-data consistency
