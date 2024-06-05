@@ -451,6 +451,9 @@ whitetip_reef_shark -> scraper
 test <- dagitty::localTests(x = DAG,
                             data = ddat,
                             abbreviate.names = FALSE)
+write.csv(x = test,
+          file = "/home/simon/Documents/Si Work/PostDoc Work/FIU/2024-01_SharksFishCoral-FrenchPoly/Nat resources/dag_inconsistencies_all.csv",
+          row.names = TRUE)
 
 
 # SUBSET DATA BASED ON CORRELATION VALUE OR P VALUE ####

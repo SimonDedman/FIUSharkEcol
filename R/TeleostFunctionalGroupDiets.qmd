@@ -15,7 +15,8 @@ Read in data.
 
 ```{r}
 #| echo: false
-root <- "/home/simon/Documents/Si Work/PostDoc Work/FIU/2024-01_SharksFishCoral-FrenchPoly/NFF Data code/"
+root <- "/home/simon/Documents/Si Work/PostDoc Work/FIU/2024-01_SharksFishCoral-FrenchPoly/NFF Data code/" # Si
+root <- "/home/NFF/MyFunFolder/SuperDuper/UltraMega/2024-01_SharksFishCoral-FrenchPoly/NFF Data code/" # NFF
 UVC <- readr::read_csv(file.path(root, "fixed_fish_uvc_final_2023_02_28.csv")) |> 
   dplyr::filter(!Family %in% c("Carcharhinidae", "Myliobatidae"))
 Diet <- readr::read_csv(file.path(root, "Trophic_Categorisation_Desbiens.csv")) |> 
